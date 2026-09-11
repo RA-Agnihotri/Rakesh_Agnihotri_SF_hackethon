@@ -1,0 +1,141 @@
+name: Deploy Insurance AI Hub
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options: [dev, staging, prod]
+
+env:
+  SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+  SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+  SNOWFLAKE_ROLE: ACCOUNTADMIN
+  SNOWFLAKE_WAREHOUSE: COMPUTE_WH
+  SNOWFLAKE_DATABASE: INSURANCE_AI_HUB
+
+jobs:
+  deploy-snowflake:
+    name: Deploy Snowflake Objects
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SnowSQL
+        run: |
+          curl -O https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.3/linux_x86_64/snowsql-1.3.1-linux_x86_64.bash
+          SNOWSQL_DEST=~/bin SNOWSQL_LOGIN_SHELL=~/.profile bash snowsql-1.3.1-linux_x86_64.bash
+
+      - name: Run SQL Scripts in Order
+        env:
+          SNOWSQL_PWD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+        run: |
+          SNOWSQL=~/bin/snowsql
+          CONN="-a $SNOWFLAKE_ACCOUNT -u $SNOWFLAKE_USER -r $SNOWFLAKE_ROLE -w $SNOWFLAKE_WAREHOUSE"
+
+          echo "=== 00: Infrastructure Setup ==="
+          $SNOWSQL $CONN -f sql/00_setup.sql
+
+          echo "=== 01: Governance (Tags, Masking) ==="
+          $SNOWSQL $CONN -f sql/01_governance.sql
+
+          echo "=== 02: Tables ==="
+          $SNOWSQL $CONN -f sql/02_tables.sql
+
+          echo "=== 03: Views ==="
+          $SNOWSQL $CONN -f sql/03_views.sql
+
+          echo "=== 04: Semantic Views ==="
+          $SNOWSQL $CONN -f sql/04_semantic_views.sql
+
+          echo "=== 05: Stored Procedures ==="
+          $SNOWSQL $CONN -f sql/05_procedures.sql
+
+          echo "=== 08: RBAC ==="
+          $SNOWSQL $CONN -f sql/08_rbac.sql
+
+          echo "=== 09: Seed Data ==="
+          $SNOWSQL $CONN -f sql/09_seed_data.sql
+
+          echo "=== 06: Cortex Search Service ==="
+          $SNOWSQL $CONN -f sql/06_cortex_search.sql
+
+          echo "=== All SQL scripts deployed successfully ==="
+
+      - name: Deploy Cortex Agent
+        env:
+          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+        run: |
+          pip install snowflake-cli-labs
+          snow cortex deploy --project-dir cortex_project/ \
+            --connection default \
+            || echo "Agent deployment requires Snowflake CLI auth — deploy manually if needed"
+
+  build-dashboard:
+    name: Build React Dashboard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: dashboard
+        run: npm ci
+
+      - name: Build Dashboard
+        working-directory: dashboard
+        env:
+          VITE_SNOWFLAKE_ACCOUNT_URL: ${{ secrets.SNOWFLAKE_ACCOUNT_URL }}
+        run: npm run build
+
+      - name: Upload Build Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dashboard-build
+          path: dashboard/dist/
+
+  validate:
+    name: Validate Deployment
+    needs: [deploy-snowflake]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install SnowSQL
+        run: |
+          curl -O https://sfc-repo.snowflakecomputing.com/snowsql/bootstrap/1.3/linux_x86_64/snowsql-1.3.1-linux_x86_64.bash
+          SNOWSQL_DEST=~/bin SNOWSQL_LOGIN_SHELL=~/.profile bash snowsql-1.3.1-linux_x86_64.bash
+
+      - name: Validate Objects
+        env:
+          SNOWSQL_PWD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+        run: |
+          SNOWSQL=~/bin/snowsql
+          CONN="-a $SNOWFLAKE_ACCOUNT -u $SNOWFLAKE_USER -r $SNOWFLAKE_ROLE -w $SNOWFLAKE_WAREHOUSE -d $SNOWFLAKE_DATABASE"
+
+          echo "--- Validating Tables ---"
+          $SNOWSQL $CONN -q "SELECT TABLE_SCHEMA, TABLE_NAME, ROW_COUNT FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA IN ('ANALYTICS','DOCUMENTS','DATA_QUALITY') ORDER BY 1,2;"
+
+          echo "--- Validating Views ---"
+          $SNOWSQL $CONN -q "SHOW VIEWS IN DATABASE INSURANCE_AI_HUB;"
+
+          echo "--- Validating Semantic Views ---"
+          $SNOWSQL $CONN -q "SHOW SEMANTIC VIEWS IN DATABASE INSURANCE_AI_HUB;"
+
+          echo "--- Validating Database Roles ---"
+          $SNOWSQL $CONN -q "SHOW DATABASE ROLES IN DATABASE INSURANCE_AI_HUB;"
+
+          echo "--- Validating Cortex Search ---"
+          $SNOWSQL $CONN -q "SHOW CORTEX SEARCH SERVICES IN DATABASE INSURANCE_AI_HUB;"
+
+          echo "=== Validation Complete ==="

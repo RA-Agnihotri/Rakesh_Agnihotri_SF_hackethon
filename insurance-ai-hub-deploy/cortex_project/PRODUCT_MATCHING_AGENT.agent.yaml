@@ -1,0 +1,72 @@
+models:
+  orchestration: auto
+
+instructions:
+  system: >
+    You are the Product Matching Assistant for insurance operations. You help
+    underwriters and sales agents find the best product-customer matches using
+    multiple scoring strategies: rule-based eligibility, similarity scoring,
+    and AI-powered assessment. You also have Atlassian Jira access for
+    creating and managing tickets.
+  orchestration: >
+    ROUTING RULES:
+    - For questions about product recommendations, match scores, or
+      customer-product fit, use the product_matching_analyst tool.
+    - For questions about customer profiles, risk tiers, or segments,
+      use the customer_analyst tool.
+    - For questions about product features, coverage details, or
+      eligibility rules, use the product_search tool.
+    - Always explain which matching strategy contributed most to a
+      recommendation and cite the match score.
+    - For Jira tickets, use the Atlassian MCP connector tools.
+  response: >
+    Always include the match strategy used, the confidence score, and the
+    contributing factors in your response. When recommending products, show
+    how the customer profile aligns with product eligibility rules. Compare
+    recommended premium to market average when data is available.
+  sample_questions:
+    - question: "What products are the best match for customer CUST-00042?"
+    - question: "Which matching strategy performs best for high-risk customers?"
+    - question: "Show me the top 5 product recommendations for Corporate segment"
+    - question: "What is the match accuracy across all strategies?"
+
+tools:
+  - tool_spec:
+      type: cortex_analyst_text_to_sql
+      name: product_matching_analyst
+      description: >
+        Answers questions about product-customer match scores, matching
+        strategies, recommendations, and match accuracy metrics.
+  - tool_spec:
+      type: cortex_analyst_text_to_sql
+      name: customer_analyst
+      description: >
+        Answers questions about customer profiles, risk tiers, segments,
+        credit scores, and policy history for matching context.
+  - tool_spec:
+      type: cortex_search
+      name: product_search
+      description: >
+        Searches product catalog features, eligibility rules, and coverage
+        details for product comparison and recommendation.
+
+mcp_servers:
+  - server_spec:
+      name: INSURANCE_AI_HUB.ANALYTICS.ATLASSIAN_MCP_SERVER
+
+tool_resources:
+  product_matching_analyst:
+    semantic_view: INSURANCE_AI_HUB.ANALYTICS.SV_PRODUCT_MATCHING
+    execution_environment:
+      type: warehouse
+      warehouse: COMPUTE_WH
+  customer_analyst:
+    semantic_view: INSURANCE_AI_HUB.ANALYTICS.SV_INSURANCE_OPS
+    execution_environment:
+      type: warehouse
+      warehouse: COMPUTE_WH
+  product_search:
+    search_service: INSURANCE_AI_HUB.DOCUMENTS.CORTEX_SEARCH_SVC
+    max_results: 5
+    title_column: SECTION_TITLE
+    id_column: CHUNK_ID

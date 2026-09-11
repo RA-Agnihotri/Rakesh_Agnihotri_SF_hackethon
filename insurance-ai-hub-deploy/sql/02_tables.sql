@@ -1,0 +1,253 @@
+-- ============================================================================
+-- INSURANCE AI HUB - Production Deployment
+-- Script 02: Table Creation (All 13 Tables with Tags & Masking)
+-- ============================================================================
+-- Run as: ACCOUNTADMIN
+-- Depends on: 00_setup.sql, 01_governance.sql
+-- ============================================================================
+
+USE ROLE ACCOUNTADMIN;
+USE DATABASE INSURANCE_AI_HUB;
+
+-- ############################################################################
+-- ANALYTICS SCHEMA - Core Business Tables
+-- ############################################################################
+
+USE SCHEMA ANALYTICS;
+
+CREATE TABLE IF NOT EXISTS AGENTS (
+    AGENT_ID            VARCHAR(20)     PRIMARY KEY,
+    AGENT_NAME          VARCHAR(100),
+    AGENT_TYPE          VARCHAR(30),
+    REGION              VARCHAR(50),
+    BRANCH              VARCHAR(50),
+    HIRE_DATE           DATE,
+    LICENSE_NUMBER      VARCHAR(30),
+    SPECIALIZATION      VARCHAR(50),
+    PERFORMANCE_RATING  FLOAT,
+    ACTIVE_FLAG         BOOLEAN         DEFAULT TRUE,
+    CREATED_AT          TIMESTAMP_NTZ   DEFAULT CURRENT_TIMESTAMP()
+);
+
+CREATE TABLE IF NOT EXISTS CUSTOMERS (
+    CUSTOMER_ID     VARCHAR(20)     PRIMARY KEY,
+    FIRST_NAME      VARCHAR(50),
+    LAST_NAME       VARCHAR(50),
+    DATE_OF_BIRTH   DATE            WITH TAG (INSURANCE_AI_HUB.ANALYTICS.PII_LEVEL='MEDIUM'),
+    GENDER          VARCHAR(10),
+    EMAIL           VARCHAR(100)    WITH MASKING POLICY INSURANCE_AI_HUB.ANALYTICS.MASK_EMAIL
+                                    WITH TAG (INSURANCE_AI_HUB.ANALYTICS.PII_LEVEL='HIGH'),
+    PHONE           VARCHAR(20)     WITH MASKING POLICY INSURANCE_AI_HUB.ANALYTICS.MASK_PHONE
+                                    WITH TAG (INSURANCE_AI_HUB.ANALYTICS.PII_LEVEL='HIGH'),
+    ADDRESS         VARCHAR(200)    WITH MASKING POLICY INSURANCE_AI_HUB.ANALYTICS.MASK_ADDRESS
+                                    WITH TAG (INSURANCE_AI_HUB.ANALYTICS.PII_LEVEL='HIGH'),
+    CITY            VARCHAR(50),
+    STATE           VARCHAR(2),
+    ZIP_CODE        VARCHAR(10),
+    RISK_TIER       VARCHAR(20),
+    CREDIT_SCORE    INT,
+    CUSTOMER_SINCE  DATE,
+    SEGMENT         VARCHAR(30),
+    CREATED_AT      TIMESTAMP_NTZ   DEFAULT CURRENT_TIMESTAMP()
+) WITH TAG (INSURANCE_AI_HUB.ANALYTICS.BUSINESS_DOMAIN='CUSTOMER');
+
+CREATE TABLE IF NOT EXISTS POLICIES (
+    POLICY_ID           VARCHAR(20)     PRIMARY KEY,
+    CUSTOMER_ID         VARCHAR(20),
+    AGENT_ID            VARCHAR(20),
+    POLICY_TYPE         VARCHAR(20),
+    POLICY_STATUS       VARCHAR(20),
+    START_DATE          DATE,
+    END_DATE            DATE,
+    PREMIUM_AMOUNT      DECIMAL(12,2),
+    COVERAGE_AMOUNT     DECIMAL(14,2),
+    DEDUCTIBLE          DECIMAL(10,2),
+    LOSS_RATIO          FLOAT,
+    PLAN_TIER           VARCHAR(20),
+    PAYMENT_FREQUENCY   VARCHAR(20),
+    AUTO_RENEW          BOOLEAN,
+    CREATED_AT          TIMESTAMP_NTZ   DEFAULT CURRENT_TIMESTAMP()
+) WITH TAG (INSURANCE_AI_HUB.ANALYTICS.BUSINESS_DOMAIN='POLICY');
+
+CREATE TABLE IF NOT EXISTS CLAIMS (
+    CLAIM_ID            VARCHAR(20)     PRIMARY KEY,
+    POLICY_ID           VARCHAR(20),
+    CUSTOMER_ID         VARCHAR(20),
+    CLAIM_DATE          DATE,
+    CLAIM_TYPE          VARCHAR(30),
+    CLAIM_STATUS        VARCHAR(30),
+    CLAIM_AMOUNT        DECIMAL(12,2),
+    APPROVED_AMOUNT     DECIMAL(12,2),
+    FRAUD_FLAG          BOOLEAN         DEFAULT FALSE,
+    FRAUD_SCORE         FLOAT,
+    ASSIGNED_ADJUSTER   VARCHAR(50),
+    RESOLUTION_DATE     DATE,
+    DAYS_TO_RESOLVE     INT,
+    FRICTION_POINT      VARCHAR(100),
+    PRIORITY            VARCHAR(10),
+    CREATED_AT          TIMESTAMP_NTZ   DEFAULT CURRENT_TIMESTAMP()
+) WITH TAG (INSURANCE_AI_HUB.ANALYTICS.BUSINESS_DOMAIN='CLAIMS');
+
+CREATE TABLE IF NOT EXISTS BILLING (
+    BILLING_ID          VARCHAR(20)     PRIMARY KEY,
+    POLICY_ID           VARCHAR(20),
+    CUSTOMER_ID         VARCHAR(20),
+    INVOICE_DATE        DATE,
+    DUE_DATE            DATE,
+    AMOUNT_DUE          DECIMAL(12,2),
+    AMOUNT_PAID         DECIMAL(12,2),
+    OUTSTANDING_BALANCE DECIMAL(12,2),
+    PAYMENT_STATUS      VARCHAR(20),
+    PAYMENT_METHOD      VARCHAR(30),
+    PAYMENT_DATE        DATE,
+    LATE_FEE            DECIMAL(8,2),
+    CREATED_AT          TIMESTAMP_NTZ   DEFAULT CURRENT_TIMESTAMP()
+) WITH TAG (INSURANCE_AI_HUB.ANALYTICS.BUSINESS_DOMAIN='BILLING');
+
+CREATE TABLE IF NOT EXISTS AT_RISK_POLICIES (
+    RISK_ID                 VARCHAR(20)     PRIMARY KEY,
+    POLICY_ID               VARCHAR(20),
+    CUSTOMER_ID             VARCHAR(20),
+    RISK_CATEGORY           VARCHAR(30),
+    RISK_SCORE              FLOAT,
+    REVENUE_AT_RISK         DECIMAL(12,2),
+    CHURN_PROBABILITY       FLOAT,
+    LAST_INTERACTION_DATE   DATE,
+    DAYS_SINCE_CONTACT      INT,
+    COMPLAINTS_COUNT        INT,
+    MISSED_PAYMENTS         INT,
+    RECOMMENDED_ACTION      VARCHAR(200),
+    IDENTIFIED_DATE         DATE,
+    CREATED_AT              TIMESTAMP_NTZ   DEFAULT CURRENT_TIMESTAMP()
+) WITH TAG (INSURANCE_AI_HUB.ANALYTICS.BUSINESS_DOMAIN='RISK');
+
+CREATE TABLE IF NOT EXISTS AGENT_AUDIT_LOG (
+    LOG_ID              VARCHAR(36)     PRIMARY KEY DEFAULT UUID_STRING(),
+    SESSION_ID          VARCHAR(36),
+    TIMESTAMP           TIMESTAMP_NTZ   DEFAULT CURRENT_TIMESTAMP(),
+    USER_NAME           VARCHAR(100),
+    USER_ROLE           VARCHAR(50),
+    QUESTION            TEXT,
+    DETECTED_INTENT     VARCHAR(50),
+    AGENT_SELECTED      VARCHAR(50),
+    TOOLS_CALLED        VARIANT,
+    SQL_EXECUTED        TEXT,
+    DATA_SOURCES        VARIANT,
+    RESPONSE_TEXT       TEXT,
+    CONFIDENCE_SCORE    FLOAT,
+    CITATIONS           VARIANT,
+    RESPONSE_TIME_MS    INT,
+    TOKEN_COUNT         INT,
+    ESTIMATED_COST      FLOAT,
+    HUMAN_ESCALATION    BOOLEAN         DEFAULT FALSE,
+    USER_FEEDBACK       VARCHAR(10),
+    ERROR_MESSAGE       TEXT
+);
+
+
+-- ############################################################################
+-- DOCUMENTS SCHEMA - Policy Documents & Chunks
+-- ############################################################################
+
+USE SCHEMA DOCUMENTS;
+
+CREATE TABLE IF NOT EXISTS POLICY_DOCUMENTS (
+    DOCUMENT_ID         VARCHAR(20)     PRIMARY KEY,
+    POLICY_ID           VARCHAR(20),
+    DOCUMENT_TYPE       VARCHAR(50),
+    DOCUMENT_TITLE      VARCHAR(200),
+    FILE_NAME           VARCHAR(200),
+    FILE_FORMAT         VARCHAR(10),
+    UPLOAD_DATE         DATE,
+    CONTENT_TEXT        TEXT,
+    EXCLUSION_CLAUSES   TEXT,
+    COVERAGE_SUMMARY    TEXT,
+    PAGE_COUNT          INT,
+    DOCUMENT_STATUS     VARCHAR(20),
+    CREATED_AT          TIMESTAMP_NTZ   DEFAULT CURRENT_TIMESTAMP()
+);
+
+CREATE TABLE IF NOT EXISTS DOCUMENT_CHUNKS (
+    CHUNK_ID        VARCHAR(20)     PRIMARY KEY,
+    DOCUMENT_ID     VARCHAR(20),
+    CHUNK_INDEX     INT,
+    CHUNK_TEXT      TEXT,
+    SECTION_TITLE   VARCHAR(200),
+    TOKEN_COUNT     INT,
+    EMBEDDING       VECTOR(FLOAT, 768),
+    CREATED_AT      TIMESTAMP_NTZ   DEFAULT CURRENT_TIMESTAMP()
+);
+
+
+-- ############################################################################
+-- DATA_QUALITY SCHEMA - DQ Monitoring Tables
+-- ############################################################################
+
+USE SCHEMA DATA_QUALITY;
+
+CREATE TABLE IF NOT EXISTS DQ_RULES (
+    RULE_ID             VARCHAR(20)     PRIMARY KEY,
+    RULE_NAME           VARCHAR(100),
+    RULE_DESCRIPTION    VARCHAR(500),
+    TARGET_TABLE        VARCHAR(100),
+    TARGET_COLUMN       VARCHAR(100),
+    RULE_TYPE           VARCHAR(30),
+    RULE_EXPRESSION     VARCHAR(500),
+    SEVERITY            VARCHAR(20),
+    IS_CRITICAL         BOOLEAN         DEFAULT FALSE,
+    THRESHOLD_PCT       FLOAT,
+    ACTIVE_FLAG         BOOLEAN         DEFAULT TRUE,
+    CREATED_AT          TIMESTAMP_NTZ   DEFAULT CURRENT_TIMESTAMP()
+);
+
+CREATE TABLE IF NOT EXISTS DQ_RESULTS (
+    RESULT_ID           VARCHAR(20)     PRIMARY KEY,
+    RULE_ID             VARCHAR(20),
+    EXECUTION_DATE      TIMESTAMP_NTZ,
+    TARGET_TABLE        VARCHAR(100),
+    TARGET_COLUMN       VARCHAR(100),
+    TOTAL_RECORDS       INT,
+    PASSED_RECORDS      INT,
+    FAILED_RECORDS      INT,
+    PASS_RATE           FLOAT,
+    STATUS              VARCHAR(20),
+    ERROR_SAMPLE        TEXT,
+    CREATED_AT          TIMESTAMP_NTZ   DEFAULT CURRENT_TIMESTAMP()
+);
+
+CREATE TABLE IF NOT EXISTS DQ_SCORES (
+    SCORE_ID            VARCHAR(20)     PRIMARY KEY,
+    TABLE_NAME          VARCHAR(100),
+    SCHEMA_NAME         VARCHAR(100),
+    SCORE_DATE          DATE,
+    OVERALL_SCORE       FLOAT,
+    COMPLETENESS_SCORE  FLOAT,
+    ACCURACY_SCORE      FLOAT,
+    CONSISTENCY_SCORE   FLOAT,
+    TIMELINESS_SCORE    FLOAT,
+    RULES_PASSED        INT,
+    RULES_FAILED        INT,
+    TOTAL_RULES         INT,
+    TREND               VARCHAR(10),
+    CREATED_AT          TIMESTAMP_NTZ   DEFAULT CURRENT_TIMESTAMP()
+);
+
+CREATE TABLE IF NOT EXISTS DQ_COLUMN_HEALTH (
+    HEALTH_ID               VARCHAR(20)     PRIMARY KEY,
+    TABLE_NAME              VARCHAR(100),
+    COLUMN_NAME             VARCHAR(100),
+    CHECK_DATE              DATE,
+    NULL_PCT                FLOAT,
+    DISTINCT_COUNT          INT,
+    DUPLICATE_PCT           FLOAT,
+    OUTLIER_COUNT           INT,
+    FORMAT_VIOLATION_COUNT  INT,
+    HEALTH_STATUS           VARCHAR(20),
+    SCORE                   FLOAT,
+    IS_CRITICAL             BOOLEAN         DEFAULT FALSE,
+    CREATED_AT              TIMESTAMP_NTZ   DEFAULT CURRENT_TIMESTAMP()
+);
+
+-- ============================================================================
+-- END OF 02_tables.sql
+-- ============================================================================

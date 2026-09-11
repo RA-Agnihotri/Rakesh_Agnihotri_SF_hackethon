@@ -1,0 +1,54 @@
+version: 1
+artifacts:
+  # ── Original artifacts ──
+  - path: SV_INSURANCE_OPS.sv.yaml
+    type: semantic_view
+    targets:
+      default:
+        object: INSURANCE_AI_HUB.ANALYTICS.SV_INSURANCE_OPS
+  - path: SV_DATA_QUALITY.sv.yaml
+    type: semantic_view
+    targets:
+      default:
+        object: INSURANCE_AI_HUB.DATA_QUALITY.SV_DATA_QUALITY
+  - path: INSURANCE_INTELLIGENCE_AGENT.agent.yaml
+    type: cortex_agent
+    targets:
+      default:
+        object: INSURANCE_AI_HUB.ANALYTICS.INSURANCE_INTELLIGENCE_AGENT
+  # ── Enhancement artifacts ──
+  - path: SV_COMPETITIVE_INTEL.sv.yaml
+    type: semantic_view
+    targets:
+      default:
+        object: INSURANCE_AI_HUB.ANALYTICS.SV_COMPETITIVE_INTEL
+  - path: SV_MARKET_INTELLIGENCE.sv.yaml
+    type: semantic_view
+    targets:
+      default:
+        object: INSURANCE_AI_HUB.ANALYTICS.SV_MARKET_INTELLIGENCE
+  - path: SV_PRODUCT_MATCHING.sv.yaml
+    type: semantic_view
+    targets:
+      default:
+        object: INSURANCE_AI_HUB.ANALYTICS.SV_PRODUCT_MATCHING
+  - path: UNIFIED_ENTERPRISE_AGENT.agent.yaml
+    type: cortex_agent
+    targets:
+      default:
+        object: INSURANCE_AI_HUB.ANALYTICS.UNIFIED_ENTERPRISE_AGENT
+  - path: MARKET_INTELLIGENCE_AGENT.agent.yaml
+    type: cortex_agent
+    targets:
+      default:
+        object: INSURANCE_AI_HUB.ANALYTICS.MARKET_INTELLIGENCE_AGENT
+  - path: PRICE_OPTIMIZATION_AGENT.agent.yaml
+    type: cortex_agent
+    targets:
+      default:
+        object: INSURANCE_AI_HUB.ANALYTICS.PRICE_OPTIMIZATION_AGENT
+  - path: PRODUCT_MATCHING_AGENT.agent.yaml
+    type: cortex_agent
+    targets:
+      default:
+        object: INSURANCE_AI_HUB.ANALYTICS.PRODUCT_MATCHING_AGENT

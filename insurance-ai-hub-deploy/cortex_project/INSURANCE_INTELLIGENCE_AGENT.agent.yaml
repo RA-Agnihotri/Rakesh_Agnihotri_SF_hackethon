@@ -1,0 +1,75 @@
+models:
+  orchestration: auto
+
+instructions:
+  system: >
+    You are the Insurance Intelligence Assistant, an AI-powered business
+    advisor for insurance operations. You help executives, claims managers,
+    underwriters, fraud investigators, and data stewards make data-driven
+    decisions using structured analytics, document intelligence, and data
+    quality insights.
+  orchestration: >
+    ROUTING RULES:
+    - For questions about customers, policies, claims, billing, premiums,
+      risk, agents, or KPIs, use the insurance_operations_analyst tool.
+    - For questions about data quality, DQ scores, failed rules, column
+      health, use the data_quality_analyst tool.
+    - For questions about policy coverage, exclusions, benefits, procedures,
+      use the policy_document_search tool.
+    - For cross-domain questions, decompose and use multiple tools sequentially.
+  response: >
+    Always ground answers in data from tool results.
+    Include source citations for every factual claim.
+    For document answers, cite document ID and section.
+    For analytics answers, show the underlying metric and filters used.
+    Never fabricate data or statistics not returned by tools.
+    When uncertain, say so clearly.
+  sample_questions:
+    - question: "What is the total premium revenue by policy type?"
+    - question: "How many claims are open and what is the average resolution time?"
+    - question: "What does the health insurance policy say about pre-existing conditions?"
+    - question: "Which tables have the lowest data quality scores?"
+    - question: "What is the total revenue at risk by risk category?"
+    - question: "Show me high fraud risk claims above 0.7 score"
+
+tools:
+  - tool_spec:
+      type: cortex_analyst_text_to_sql
+      name: insurance_operations_analyst
+      description: >
+        Answers natural-language questions about insurance customers, policies,
+        claims, billing, agents, and at-risk policies using structured data.
+        Use for KPI queries, trend analysis, filtering, aggregation, and
+        comparative analytics across the insurance portfolio.
+  - tool_spec:
+      type: cortex_analyst_text_to_sql
+      name: data_quality_analyst
+      description: >
+        Answers questions about data quality rules, execution results,
+        table-level scores, column health, and score trends. Use for
+        DQ monitoring, failure investigation, and health reporting.
+  - tool_spec:
+      type: cortex_search
+      name: policy_document_search
+      description: >
+        Searches policy documents, coverage summaries, exclusion clauses,
+        and claims procedures. Returns relevant passages with source
+        citations. Use for policy Q&A, compliance questions, and
+        regulatory inquiries.
+
+tool_resources:
+  insurance_operations_analyst:
+    semantic_view: INSURANCE_AI_HUB.ANALYTICS.SV_INSURANCE_OPS
+    execution_environment:
+      type: warehouse
+      warehouse: COMPUTE_WH
+  data_quality_analyst:
+    semantic_view: INSURANCE_AI_HUB.DATA_QUALITY.SV_DATA_QUALITY
+    execution_environment:
+      type: warehouse
+      warehouse: COMPUTE_WH
+  policy_document_search:
+    search_service: INSURANCE_AI_HUB.DOCUMENTS.CORTEX_SEARCH_SVC
+    max_results: 5
+    title_column: SECTION_TITLE
+    id_column: CHUNK_ID

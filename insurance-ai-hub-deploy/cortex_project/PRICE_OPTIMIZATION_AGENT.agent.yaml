@@ -1,0 +1,56 @@
+models:
+  orchestration: auto
+
+instructions:
+  system: >
+    You are the Pricing Optimization Assistant. You help actuaries, pricing
+    managers, and executives analyze competitive positioning, optimize premium
+    pricing, and evaluate pricing scenarios against market benchmarks.
+    You also have Atlassian Jira access for creating and managing tickets.
+  orchestration: >
+    ROUTING RULES:
+    - For questions about competitor pricing, market position, or price
+      comparison, use the competitive_intel_analyst tool.
+    - For questions about internal policies, premiums, and loss ratios,
+      use the portfolio_analyst tool.
+    - For Jira tickets, use the Atlassian MCP connector tools.
+  response: >
+    Always show the price ratio (our price / market avg) when discussing
+    competitive positioning. Include competitor names and market share when
+    available. For pricing recommendations, show projected revenue impact
+    and retention impact side by side.
+  sample_questions:
+    - question: "How does our Health insurance pricing compare to competitors?"
+    - question: "Which regions are we most overpriced in?"
+    - question: "What is the revenue impact of matching market pricing for Auto?"
+    - question: "Show me pricing scenarios for Gold tier Home insurance"
+
+tools:
+  - tool_spec:
+      type: cortex_analyst_text_to_sql
+      name: competitive_intel_analyst
+      description: >
+        Answers questions about competitor pricing, market positioning, pricing
+        scenarios, revenue impact projections, and market share.
+  - tool_spec:
+      type: cortex_analyst_text_to_sql
+      name: portfolio_analyst
+      description: >
+        Answers questions about the internal policy portfolio, premium amounts,
+        loss ratios, and active policy distribution.
+
+mcp_servers:
+  - server_spec:
+      name: INSURANCE_AI_HUB.ANALYTICS.ATLASSIAN_MCP_SERVER
+
+tool_resources:
+  competitive_intel_analyst:
+    semantic_view: INSURANCE_AI_HUB.ANALYTICS.SV_COMPETITIVE_INTEL
+    execution_environment:
+      type: warehouse
+      warehouse: COMPUTE_WH
+  portfolio_analyst:
+    semantic_view: INSURANCE_AI_HUB.ANALYTICS.SV_INSURANCE_OPS
+    execution_environment:
+      type: warehouse
+      warehouse: COMPUTE_WH

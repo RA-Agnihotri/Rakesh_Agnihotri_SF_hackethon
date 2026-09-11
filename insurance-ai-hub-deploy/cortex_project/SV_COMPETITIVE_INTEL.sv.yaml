@@ -1,0 +1,8 @@
+# Semantic View: Competitive Intelligence
+# Tables: COMPETITOR_PRICING, PRODUCT_CATALOG, PRICING_SCENARIOS, POLICIES
+# VQRs: 4
+
+name: SV_COMPETITIVE_INTEL
+description: >
+  Competitive intelligence model for insurance pricing analysis. Covers product
+  catalog, competitor pricing benchmarks, and pricing optimization scenarios.

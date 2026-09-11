@@ -1,0 +1,247 @@
+name: SV_DATA_QUALITY
+description: Data quality monitoring model covering quality rules, execution results,
+  table-level scores, and column-level health. Supports conversational data quality
+  investigation, root-cause analysis, trend monitoring, and remediation tracking.
+tables:
+  - name: DQ_RULES
+    base_table:
+      database: INSURANCE_AI_HUB
+      schema: DATA_QUALITY
+      table: DQ_RULES
+    primary_key:
+      columns:
+        - RULE_ID
+    dimensions:
+      - name: RULE_ID
+        expr: RULE_ID
+        data_type: VARCHAR
+      - name: RULE_NAME
+        expr: RULE_NAME
+        data_type: VARCHAR
+      - name: RULE_DESCRIPTION
+        expr: RULE_DESCRIPTION
+        data_type: VARCHAR
+      - name: TARGET_TABLE
+        expr: TARGET_TABLE
+        data_type: VARCHAR
+      - name: TARGET_COLUMN
+        expr: TARGET_COLUMN
+        data_type: VARCHAR
+      - name: RULE_TYPE
+        expr: RULE_TYPE
+        data_type: VARCHAR
+      - name: RULE_EXPRESSION
+        expr: RULE_EXPRESSION
+        data_type: VARCHAR
+      - name: SEVERITY
+        expr: SEVERITY
+        data_type: VARCHAR
+      - name: IS_CRITICAL
+        expr: IS_CRITICAL
+        data_type: BOOLEAN
+      - name: ACTIVE_FLAG
+        expr: ACTIVE_FLAG
+        data_type: BOOLEAN
+    time_dimensions:
+      - name: CREATED_AT
+        expr: CREATED_AT
+        data_type: TIMESTAMP_NTZ
+    facts:
+      - name: THRESHOLD_PCT
+        expr: THRESHOLD_PCT
+        data_type: FLOAT
+  - name: DQ_RESULTS
+    base_table:
+      database: INSURANCE_AI_HUB
+      schema: DATA_QUALITY
+      table: DQ_RESULTS
+    primary_key:
+      columns:
+        - RESULT_ID
+    dimensions:
+      - name: RESULT_ID
+        expr: RESULT_ID
+        data_type: VARCHAR
+      - name: RULE_ID
+        expr: RULE_ID
+        data_type: VARCHAR
+      - name: TARGET_TABLE
+        expr: TARGET_TABLE
+        data_type: VARCHAR
+      - name: TARGET_COLUMN
+        expr: TARGET_COLUMN
+        data_type: VARCHAR
+      - name: TOTAL_RECORDS
+        expr: TOTAL_RECORDS
+        data_type: NUMBER
+      - name: PASSED_RECORDS
+        expr: PASSED_RECORDS
+        data_type: NUMBER
+      - name: FAILED_RECORDS
+        expr: FAILED_RECORDS
+        data_type: NUMBER
+      - name: STATUS
+        expr: STATUS
+        data_type: VARCHAR
+      - name: ERROR_SAMPLE
+        expr: ERROR_SAMPLE
+        data_type: VARCHAR
+    time_dimensions:
+      - name: EXECUTION_DATE
+        expr: EXECUTION_DATE
+        data_type: TIMESTAMP_NTZ
+      - name: CREATED_AT
+        expr: CREATED_AT
+        data_type: TIMESTAMP_NTZ
+    facts:
+      - name: PASS_RATE
+        expr: PASS_RATE
+        data_type: FLOAT
+  - name: DQ_SCORES
+    base_table:
+      database: INSURANCE_AI_HUB
+      schema: DATA_QUALITY
+      table: DQ_SCORES
+    primary_key:
+      columns:
+        - SCORE_ID
+    dimensions:
+      - name: SCORE_ID
+        expr: SCORE_ID
+        data_type: VARCHAR
+      - name: TABLE_NAME
+        expr: TABLE_NAME
+        data_type: VARCHAR
+      - name: SCHEMA_NAME
+        expr: SCHEMA_NAME
+        data_type: VARCHAR
+      - name: RULES_PASSED
+        expr: RULES_PASSED
+        data_type: NUMBER
+      - name: RULES_FAILED
+        expr: RULES_FAILED
+        data_type: NUMBER
+      - name: TOTAL_RULES
+        expr: TOTAL_RULES
+        data_type: NUMBER
+      - name: TREND
+        expr: TREND
+        data_type: VARCHAR
+    time_dimensions:
+      - name: SCORE_DATE
+        expr: SCORE_DATE
+        data_type: DATE
+      - name: CREATED_AT
+        expr: CREATED_AT
+        data_type: TIMESTAMP_NTZ
+    facts:
+      - name: OVERALL_SCORE
+        expr: OVERALL_SCORE
+        data_type: FLOAT
+      - name: COMPLETENESS_SCORE
+        expr: COMPLETENESS_SCORE
+        data_type: FLOAT
+      - name: ACCURACY_SCORE
+        expr: ACCURACY_SCORE
+        data_type: FLOAT
+      - name: CONSISTENCY_SCORE
+        expr: CONSISTENCY_SCORE
+        data_type: FLOAT
+      - name: TIMELINESS_SCORE
+        expr: TIMELINESS_SCORE
+        data_type: FLOAT
+  - name: DQ_COLUMN_HEALTH
+    base_table:
+      database: INSURANCE_AI_HUB
+      schema: DATA_QUALITY
+      table: DQ_COLUMN_HEALTH
+    primary_key:
+      columns:
+        - HEALTH_ID
+    dimensions:
+      - name: HEALTH_ID
+        expr: HEALTH_ID
+        data_type: VARCHAR
+      - name: TABLE_NAME
+        expr: TABLE_NAME
+        data_type: VARCHAR
+      - name: COLUMN_NAME
+        expr: COLUMN_NAME
+        data_type: VARCHAR
+      - name: DISTINCT_COUNT
+        expr: DISTINCT_COUNT
+        data_type: NUMBER
+      - name: OUTLIER_COUNT
+        expr: OUTLIER_COUNT
+        data_type: NUMBER
+      - name: FORMAT_VIOLATION_COUNT
+        expr: FORMAT_VIOLATION_COUNT
+        data_type: NUMBER
+      - name: HEALTH_STATUS
+        expr: HEALTH_STATUS
+        data_type: VARCHAR
+      - name: IS_CRITICAL
+        expr: IS_CRITICAL
+        data_type: BOOLEAN
+    time_dimensions:
+      - name: CHECK_DATE
+        expr: CHECK_DATE
+        data_type: DATE
+      - name: CREATED_AT
+        expr: CREATED_AT
+        data_type: TIMESTAMP_NTZ
+    facts:
+      - name: NULL_PCT
+        expr: NULL_PCT
+        data_type: FLOAT
+      - name: DUPLICATE_PCT
+        expr: DUPLICATE_PCT
+        data_type: FLOAT
+      - name: SCORE
+        expr: SCORE
+        data_type: FLOAT
+relationships:
+  - name: DQ_RESULTS_TO_DQ_RULES
+    left_table: DQ_RESULTS
+    right_table: DQ_RULES
+    join_type: inner
+    relationship_type: many_to_one
+    relationship_columns:
+      - left_column: RULE_ID
+        right_column: RULE_ID
+verified_queries:
+  - name: 0;1
+    question: Which tables have the lowest data quality scores?
+    sql: SELECT TABLE_NAME, OVERALL_SCORE, COMPLETENESS_SCORE, ACCURACY_SCORE, CONSISTENCY_SCORE,
+      TIMELINESS_SCORE, TREND FROM dq_scores WHERE SCORE_DATE = (SELECT MAX(SCORE_DATE)
+      FROM dq_scores) ORDER BY OVERALL_SCORE ASC
+    verified_at: 1788433817
+    verified_by: Semantic Model Generator
+  - name: 1;1
+    question: What are the failed data quality rules and their details?
+    sql: SELECT r.TARGET_TABLE, r.TARGET_COLUMN, rl.RULE_NAME, rl.SEVERITY, r.PASS_RATE,
+      r.FAILED_RECORDS, r.ERROR_SAMPLE FROM dq_results AS r JOIN dq_rules AS rl ON
+      r.RULE_ID = rl.RULE_ID WHERE r.STATUS = 'FAIL' ORDER BY r.PASS_RATE ASC
+    verified_at: 1788433817
+    verified_by: Semantic Model Generator
+  - name: 2;1
+    question: Which columns have critical or warning health status?
+    sql: SELECT TABLE_NAME, COLUMN_NAME, HEALTH_STATUS, SCORE, NULL_PCT, OUTLIER_COUNT,
+      FORMAT_VIOLATION_COUNT FROM dq_column_health WHERE HEALTH_STATUS IN ('Critical',
+      'Warning') ORDER BY SCORE ASC
+    verified_at: 1788433817
+    verified_by: Semantic Model Generator
+  - name: 3;1
+    question: What is the data quality score trend over time by table?
+    sql: SELECT TABLE_NAME, SCORE_DATE, OVERALL_SCORE, TREND FROM dq_scores ORDER
+      BY TABLE_NAME, SCORE_DATE
+    verified_at: 1788433817
+    verified_by: Semantic Model Generator
+  - name: 4;1
+    question: How many active data quality rules are there by type, and how many of
+      those are critical?
+    sql: SELECT RULE_TYPE, COUNT(*) AS rule_count, SUM(CASE WHEN IS_CRITICAL THEN
+      1 ELSE 0 END) AS critical_count FROM dq_rules WHERE ACTIVE_FLAG = TRUE GROUP
+      BY RULE_TYPE ORDER BY rule_count DESC
+    verified_at: 1788433817
+    verified_by: Semantic Model Generator

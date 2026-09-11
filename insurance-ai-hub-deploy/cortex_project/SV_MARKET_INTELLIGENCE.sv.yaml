@@ -1,0 +1,8 @@
+# Semantic View: Market Intelligence
+# Tables: MARKET_TRENDS, COMPETITOR_PRICING
+# VQRs: 3
+
+name: SV_MARKET_INTELLIGENCE
+description: >
+  Market intelligence model for insurance industry analysis. Covers market trends,
+  industry benchmarks, year-over-year changes, and regional conditions.

@@ -1,0 +1,60 @@
+models:
+  orchestration: auto
+
+instructions:
+  system: >
+    You are the Market Intelligence Assistant. You help executives and
+    strategists understand market trends, detect anomalies in performance data,
+    forecast future metrics, and benchmark against industry standards.
+    You also have Atlassian Jira access for creating and managing tickets.
+  orchestration: >
+    ROUTING RULES:
+    - For questions about market trends, industry benchmarks, or
+      year-over-year changes, use the market_analyst tool.
+    - For questions about internal claims, premium, or performance
+      trends, use the operations_analyst tool.
+    - For Jira tickets, use the Atlassian MCP connector tools.
+  response: >
+    Always include the trend direction and YoY change when discussing market
+    metrics. Compare internal performance to industry benchmarks when possible.
+    Flag anomalies and explain potential drivers. When showing trends, include
+    both the data and the interpretation.
+  sample_questions:
+    - question: "What are the key market trends for Auto insurance this quarter?"
+    - question: "How do our loss ratios compare to industry averages?"
+    - question: "Which regions are seeing the fastest premium growth?"
+    - question: "Are there any anomalies in our claims data?"
+
+tools:
+  - tool_spec:
+      type: cortex_analyst_text_to_sql
+      name: market_analyst
+      description: >
+        Answers questions about market trends, industry benchmarks, competitive
+        landscape, year-over-year changes, and regional market conditions.
+  - tool_spec:
+      type: cortex_analyst_text_to_sql
+      name: operations_analyst
+      description: >
+        Answers questions about internal insurance operations including claims,
+        policies, premiums, loss ratios, and portfolio performance.
+  - tool_spec:
+      type: data_to_chart
+      name: data_to_chart
+      description: "Generates visualizations from data returned by other tools."
+
+mcp_servers:
+  - server_spec:
+      name: INSURANCE_AI_HUB.ANALYTICS.ATLASSIAN_MCP_SERVER
+
+tool_resources:
+  market_analyst:
+    semantic_view: INSURANCE_AI_HUB.ANALYTICS.SV_MARKET_INTELLIGENCE
+    execution_environment:
+      type: warehouse
+      warehouse: COMPUTE_WH
+  operations_analyst:
+    semantic_view: INSURANCE_AI_HUB.ANALYTICS.SV_INSURANCE_OPS
+    execution_environment:
+      type: warehouse
+      warehouse: COMPUTE_WH

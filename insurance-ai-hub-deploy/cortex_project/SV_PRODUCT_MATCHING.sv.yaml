@@ -1,0 +1,8 @@
+# Semantic View: Product Matching
+# Tables: PRODUCT_MATCH_SCORES, PRODUCT_CATALOG, CUSTOMERS
+# VQRs: 3
+
+name: SV_PRODUCT_MATCHING
+description: >
+  Product matching model for customer-product recommendations. Covers match scores
+  from multiple strategies and product catalog details.
