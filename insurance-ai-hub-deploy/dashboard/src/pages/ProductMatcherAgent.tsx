@@ -2,8 +2,10 @@ import { useState, useRef, useEffect } from 'react';
 import KPICard from '../components/dashboard/KPICard';
 import DataVisualizer, { type DataSet } from '../components/shared/DataVisualizer';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
-import { Database, Search, CheckCircle2, Target, Zap, Bot, Send, User, Sparkles, X } from 'lucide-react';
+import { Database, Search, CheckCircle2, Target, Zap, Bot, Send, User, Sparkles, X, Mic, MicOff, Languages, Loader2 } from 'lucide-react';
 import { getToken } from '../services/snowflake-api';
+import { useVoiceInput } from '../hooks/useVoiceInput';
+import { detectAndTranslate, type TranslationResult } from '../services/translate';
 
 const AGENT = 'PRODUCT_MATCHING_AGENT';
 const ACCENT = '#f59e0b';
@@ -54,7 +56,14 @@ export default function ProductMatcherAgent() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationInfo, setTranslationInfo] = useState<TranslationResult | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const handleVoiceResult = async (text: string) => {
+    setIsTranslating(true); setTranslationInfo(null);
+    try { const r = await detectAndTranslate(text); setInput(r.translatedText); if (r.wasTranslated) setTranslationInfo(r); } catch { setInput(text); } finally { setIsTranslating(false); }
+  };
+  const voice = useVoiceInput(handleVoiceResult);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   const handleAsk = async (question?: string) => {
@@ -128,7 +137,21 @@ export default function ProductMatcherAgent() {
           {isLoading && <div className="flex gap-2"><div className="w-6 h-6 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center flex-shrink-0"><Bot className="w-3 h-3 text-white animate-pulse" /></div><div className="bg-gray-50 dark:bg-slate-700/50 border rounded-2xl px-3 py-2"><p className="text-[10px] text-gray-500 mb-1">Finding matches...</p><div className="flex gap-1"><div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} /><div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} /><div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} /></div></div></div>}
           <div ref={bottomRef} />
         </div>
-        <div className="border-t border-gray-200 dark:border-slate-700 p-3"><div className="flex items-center bg-gray-50 dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600 focus-within:ring-2 focus-within:ring-orange-500"><input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleAsk()} placeholder="Ask about product matching..." className="flex-1 px-3 py-2.5 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none" disabled={isLoading} /><button onClick={() => handleAsk()} disabled={!input.trim() || isLoading} className="p-2.5 text-orange-600 hover:text-orange-700 disabled:opacity-30"><Send className="w-4 h-4" /></button></div></div>
+        <div className="border-t border-gray-200 dark:border-slate-700 p-3">
+          {(voice.state === 'recording' || isTranslating || voice.error || translationInfo) && (
+            <div className="mb-2 flex items-center gap-2 text-[10px]">
+              {voice.state === 'recording' && <span className="flex items-center gap-1 text-red-500 font-medium"><span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />Listening...</span>}
+              {isTranslating && <span className="flex items-center gap-1 text-blue-500"><Loader2 className="w-3 h-3 animate-spin" /> Translating...</span>}
+              {voice.error && <span className="text-red-500">{voice.error}</span>}
+              {translationInfo && !isTranslating && <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400"><Languages className="w-3 h-3" /> Translated</span>}
+            </div>
+          )}
+          <div className="flex items-center bg-gray-50 dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600 focus-within:ring-2 focus-within:ring-orange-500">
+            <input value={input} onChange={e => { setInput(e.target.value); setTranslationInfo(null); }} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleAsk()} placeholder={voice.state === 'recording' ? 'Listening...' : 'Ask about product matching...'} className="flex-1 px-3 py-2.5 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none" disabled={isLoading || voice.state === 'recording'} />
+            {voice.isSupported && <button onClick={voice.state === 'recording' ? voice.stopRecording : voice.startRecording} disabled={isLoading || isTranslating} className={`p-2 transition-colors ${voice.state === 'recording' ? 'text-red-500' : 'text-gray-400 hover:text-orange-600'} disabled:opacity-30`} title={voice.state === 'recording' ? 'Stop' : 'Voice input'}>{voice.state === 'recording' ? <MicOff className="w-4 h-4" /> : isTranslating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}</button>}
+            <button onClick={() => handleAsk()} disabled={!input.trim() || isLoading} className="p-2.5 text-orange-600 hover:text-orange-700 disabled:opacity-30"><Send className="w-4 h-4" /></button>
+          </div>
+        </div>
       </div>
     </div>
   );

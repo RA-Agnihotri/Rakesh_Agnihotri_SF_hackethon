@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Database, Play, Copy, ChevronRight, Loader2, AlertCircle, CheckCircle, Sparkles, Send, ArrowDown, Bot } from 'lucide-react';
+import { Database, Play, Copy, ChevronRight, Loader2, AlertCircle, CheckCircle, Sparkles, Send, ArrowDown, Bot, Mic, MicOff, Languages } from 'lucide-react';
 import { executeSQL } from '../services/snowflake-api';
 import { getToken } from '../services/snowflake-api';
+import { useVoiceInput } from '../hooks/useVoiceInput';
+import { detectAndTranslate, type TranslationResult } from '../services/translate';
 
 const SCHEMA_TREE = [
   { schema: 'ANALYTICS', tables: ['AGENTS', 'CUSTOMERS', 'POLICIES', 'CLAIMS', 'BILLING', 'AT_RISK_POLICIES'] },
@@ -36,6 +38,14 @@ export default function DataExplorer() {
   const [nlError, setNlError] = useState('');
   const [generatedSQL, setGeneratedSQL] = useState('');
   const [nlExplanation, setNlExplanation] = useState('');
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationInfo, setTranslationInfo] = useState<TranslationResult | null>(null);
+
+  const handleVoiceResult = async (text: string) => {
+    setIsTranslating(true); setTranslationInfo(null);
+    try { const r = await detectAndTranslate(text); setNlQuery(r.translatedText); if (r.wasTranslated) setTranslationInfo(r); } catch { setNlQuery(text); } finally { setIsTranslating(false); }
+  };
+  const voice = useVoiceInput(handleVoiceResult);
 
   const toggle = (schema: string) => setExpanded(e => e.includes(schema) ? e.filter(s => s !== schema) : [...e, schema]);
 
@@ -204,18 +214,35 @@ export default function DataExplorer() {
             <div className="flex-1 flex items-center bg-white/10 backdrop-blur rounded-lg border border-white/20 focus-within:ring-2 focus-within:ring-white/50">
               <input
                 value={nlQuery}
-                onChange={(e) => setNlQuery(e.target.value)}
+                onChange={(e) => { setNlQuery(e.target.value); setTranslationInfo(null); }}
                 onKeyDown={(e) => e.key === 'Enter' && handleNLQuery()}
-                placeholder='e.g. "Show total premium by policy type" — Agent converts to SQL and executes'
+                placeholder={voice.state === 'recording' ? 'Listening...' : 'e.g. "Show total premium by policy type" — Agent converts to SQL and executes'}
                 className="flex-1 px-4 py-2.5 bg-transparent text-sm text-white placeholder-white/60 focus:outline-none"
-                disabled={nlLoading}
+                disabled={nlLoading || voice.state === 'recording'}
               />
+              {voice.isSupported && (
+                <button onClick={voice.state === 'recording' ? voice.stopRecording : voice.startRecording} disabled={nlLoading || isTranslating}
+                  className={`p-2.5 transition-colors ${voice.state === 'recording' ? 'text-red-300 hover:text-red-200' : 'text-white/60 hover:text-white'} disabled:opacity-30`}
+                  title={voice.state === 'recording' ? 'Stop recording' : 'Voice input'}>
+                  {voice.state === 'recording' ? <MicOff className="w-4 h-4" /> : isTranslating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+                </button>
+              )}
               <button onClick={() => handleNLQuery()} disabled={!nlQuery.trim() || nlLoading}
                 className="p-2.5 text-white/80 hover:text-white disabled:opacity-30">
                 {nlLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               </button>
             </div>
           </div>
+
+          {/* Voice / Translation status */}
+          {(voice.state === 'recording' || isTranslating || voice.error || translationInfo) && (
+            <div className="mt-2 flex items-center gap-2 text-xs">
+              {voice.state === 'recording' && <span className="flex items-center gap-1.5 text-red-200 font-medium"><span className="w-2 h-2 rounded-full bg-red-400 animate-pulse" />Listening...</span>}
+              {isTranslating && <span className="flex items-center gap-1.5 text-white/70 font-medium"><Loader2 className="w-3 h-3 animate-spin" /> Translating...</span>}
+              {voice.error && <span className="text-red-200">{voice.error}</span>}
+              {translationInfo && !isTranslating && <span className="flex items-center gap-1.5 text-green-200"><Languages className="w-3 h-3" /> Translated from: "{translationInfo.originalText}"</span>}
+            </div>
+          )}
 
           {/* NL Status Messages */}
           {nlLoading && (

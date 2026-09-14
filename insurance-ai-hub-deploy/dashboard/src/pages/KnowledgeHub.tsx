@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Search, FileText, Bot, Send, Loader2, User, Sparkles, X, BookOpen } from 'lucide-react';
+import { Search, FileText, Bot, Send, Loader2, User, Sparkles, X, BookOpen, Mic, MicOff, Languages } from 'lucide-react';
 import { useSnowflakeQuery, toObjects } from '../hooks/useSnowflakeQuery';
 import { getToken } from '../services/snowflake-api';
 import RefreshButton from '../components/shared/RefreshButton';
 import { useRefresh } from '../hooks/useSnowflakeQuery';
+import { useVoiceInput } from '../hooks/useVoiceInput';
+import { detectAndTranslate, type TranslationResult } from '../services/translate';
 
 const DOCS_SQL = `
   SELECT DOCUMENT_ID, DOCUMENT_TITLE, DOCUMENT_TYPE, DOCUMENT_STATUS, PAGE_COUNT,
@@ -55,7 +57,15 @@ export default function KnowledgeHub() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationInfo, setTranslationInfo] = useState<TranslationResult | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const handleVoiceResult = async (text: string) => {
+    setIsTranslating(true); setTranslationInfo(null);
+    try { const r = await detectAndTranslate(text); setInput(r.translatedText); if (r.wasTranslated) setTranslationInfo(r); } catch { setInput(text); } finally { setIsTranslating(false); }
+  };
+  const voice = useVoiceInput(handleVoiceResult);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
@@ -351,16 +361,31 @@ export default function KnowledgeHub() {
 
         {/* Input */}
         <div className="border-t border-gray-200 dark:border-slate-700 p-3">
+          {(voice.state === 'recording' || isTranslating || voice.error || translationInfo) && (
+            <div className="mb-2 flex items-center gap-2 text-xs">
+              {voice.state === 'recording' && <span className="flex items-center gap-1.5 text-red-500 font-medium"><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />Listening...</span>}
+              {isTranslating && <span className="flex items-center gap-1.5 text-blue-500 font-medium"><Loader2 className="w-3 h-3 animate-spin" /> Translating...</span>}
+              {voice.error && <span className="text-red-500">{voice.error}</span>}
+              {translationInfo && !isTranslating && <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400"><Languages className="w-3 h-3" /> Translated from: "{translationInfo.originalText}"</span>}
+            </div>
+          )}
           <div className="flex gap-2">
             <div className="flex-1 flex items-center bg-gray-50 dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600 focus-within:ring-2 focus-within:ring-green-500 focus-within:border-green-500">
               <input
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => { setInput(e.target.value); setTranslationInfo(null); }}
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleAsk()}
-                placeholder="Ask about policy coverage, exclusions, claims procedures..."
+                placeholder={voice.state === 'recording' ? 'Listening...' : 'Ask about policy coverage, exclusions, claims procedures...'}
                 className="flex-1 px-3 py-2.5 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none"
-                disabled={isLoading}
+                disabled={isLoading || voice.state === 'recording'}
               />
+              {voice.isSupported && (
+                <button onClick={voice.state === 'recording' ? voice.stopRecording : voice.startRecording} disabled={isLoading || isTranslating}
+                  className={`p-2.5 transition-colors ${voice.state === 'recording' ? 'text-red-500 hover:text-red-600' : 'text-gray-400 hover:text-green-600'} disabled:opacity-30`}
+                  title={voice.state === 'recording' ? 'Stop recording' : 'Voice input'}>
+                  {voice.state === 'recording' ? <MicOff className="w-4 h-4" /> : isTranslating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
+                </button>
+              )}
               <button
                 onClick={() => handleAsk()}
                 disabled={!input.trim() || isLoading}
