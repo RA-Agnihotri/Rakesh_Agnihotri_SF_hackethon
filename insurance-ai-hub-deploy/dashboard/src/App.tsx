@@ -12,13 +12,25 @@ import DocumentIntelligence from './pages/DocumentIntelligence';
 import DataExplorer from './pages/DataExplorer';
 import GovernanceDashboard from './pages/GovernanceDashboard';
 import AdminConsole from './pages/AdminConsole';
+import MarketIntelAgent from './pages/MarketIntelAgent';
+import PricingAdvisorAgent from './pages/PricingAdvisorAgent';
+import ProductMatcherAgent from './pages/ProductMatcherAgent';
+import EnterpriseHubAgent from './pages/EnterpriseHubAgent';
 import { getToken, setToken } from './services/snowflake-api';
 import { prefetchAllDashboardData } from './services/prefetch';
+import { useThemeStore } from './stores';
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState(false);
   const [checking, setChecking] = useState(true);
   const queryClient = useQueryClient();
+  const setDark = useThemeStore((s) => s.setDark);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setDark(saved === 'dark' || (!saved && prefersDark));
+  }, []);
 
   useEffect(() => {
     const envPat = import.meta.env.VITE_SNOWFLAKE_PAT;
@@ -52,6 +64,10 @@ export default function App() {
         <Route path="/explorer" element={<DataExplorer />} />
         <Route path="/governance" element={<GovernanceDashboard />} />
         <Route path="/admin" element={<AdminConsole />} />
+        <Route path="/market-intel" element={<MarketIntelAgent />} />
+        <Route path="/pricing-advisor" element={<PricingAdvisorAgent />} />
+        <Route path="/product-matcher" element={<ProductMatcherAgent />} />
+        <Route path="/enterprise-hub" element={<EnterpriseHubAgent />} />
       </Routes>
     </Layout>
   );

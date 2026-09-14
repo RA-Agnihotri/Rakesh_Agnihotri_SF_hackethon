@@ -6,11 +6,18 @@ function getBaseUrl(): string {
   return SNOWFLAKE_CONFIG.accountUrl;
 }
 
+export interface ResultDataSet {
+  columns: string[];
+  types: string[];
+  rows: string[][];
+}
+
 export interface AgentResponse {
   text: string;
   toolTrace: ToolTraceItem[];
   sql?: string;
   tableData?: { columns: string[]; rows: string[][] };
+  datasets: ResultDataSet[];
   requestId?: string;
 }
 
@@ -22,26 +29,33 @@ export interface ToolTraceItem {
   status: 'success' | 'error';
 }
 
-let conversationHistory: Array<{ role: string; content: any }> = [];
+const conversationHistories: Record<string, Array<{ role: string; content: any }>> = {};
 
-export function clearConversation() {
-  conversationHistory = [];
+function getHistory(agentName: string) {
+  if (!conversationHistories[agentName]) conversationHistories[agentName] = [];
+  return conversationHistories[agentName];
 }
 
-export async function runAgentQuery(question: string): Promise<AgentResponse> {
+export function clearConversation(agentName?: string) {
+  if (agentName) {
+    conversationHistories[agentName] = [];
+  } else {
+    Object.keys(conversationHistories).forEach(k => conversationHistories[k] = []);
+  }
+}
+
+export async function runAgentQuery(question: string, agentName: string = 'INSURANCE_INTELLIGENCE_AGENT'): Promise<AgentResponse> {
   const token = getToken();
   if (!token) throw new Error('Not authenticated');
 
-  conversationHistory.push({
+  const history = getHistory(agentName);
+  history.push({
     role: 'user',
     content: [{ type: 'text', text: question }],
   });
 
   const baseUrl = getBaseUrl();
-
-  // Use the agent object endpoint — this picks up the agent's configured tools
-  // Format: /api/v2/databases/{db}/schemas/{schema}/agents/{name}:run
-  const agentUrl = `${baseUrl}/api/v2/databases/INSURANCE_AI_HUB/schemas/ANALYTICS/agents/INSURANCE_INTELLIGENCE_AGENT:run`;
+  const agentUrl = `${baseUrl}/api/v2/databases/INSURANCE_AI_HUB/schemas/ANALYTICS/agents/${agentName}:run`;
 
   const resp = await fetch(agentUrl, {
     method: 'POST',
@@ -52,15 +66,14 @@ export async function runAgentQuery(question: string): Promise<AgentResponse> {
       'X-Snowflake-Authorization-Token-Type': 'PROGRAMMATIC_ACCESS_TOKEN',
     },
     body: JSON.stringify({
-      messages: conversationHistory,
+      messages: history,
       stream: false,
     }),
   });
 
   if (!resp.ok) {
     const errText = await resp.text();
-    // Remove last message on failure
-    conversationHistory.pop();
+    history.pop();
     throw new Error(`Agent API ${resp.status}: ${errText.substring(0, 300)}`);
   }
 
@@ -79,6 +92,7 @@ export async function runAgentQuery(question: string): Promise<AgentResponse> {
   const content = result.content || [];
   const textParts: string[] = [];
   const toolTrace: ToolTraceItem[] = [];
+  const datasets: ResultDataSet[] = [];
   let sql: string | undefined;
   let tableData: { columns: string[]; rows: string[][] } | undefined;
 
@@ -111,15 +125,10 @@ export async function runAgentQuery(question: string): Promise<AgentResponse> {
           }
           if (c.json.result_set?.data && c.json.result_set?.resultSetMetaData?.rowType) {
             const cols = c.json.result_set.resultSetMetaData.rowType.map((col: any) => col.name);
+            const types = c.json.result_set.resultSetMetaData.rowType.map((col: any) => col.type || '');
             const rows = c.json.result_set.data;
             tableData = { columns: cols, rows };
-            if (cols.length > 0 && rows.length > 0) {
-              const header = '| ' + cols.join(' | ') + ' |';
-              const sep = '| ' + cols.map(() => '---').join(' | ') + ' |';
-              const dataRows = rows.slice(0, 25).map((r: string[]) => '| ' + r.map(v => v ?? 'NULL').join(' | ') + ' |');
-              textParts.push('\n' + [header, sep, ...dataRows].join('\n') + '\n');
-              if (rows.length > 25) textParts.push(`\n*...and ${rows.length - 25} more rows*\n`);
-            }
+            datasets.push({ columns: cols, types, rows });
           }
         }
       }
@@ -128,19 +137,22 @@ export async function runAgentQuery(question: string): Promise<AgentResponse> {
     if (block.type === 'table' && block.table?.result_set) {
       const rs = block.table.result_set;
       if (rs.data && rs.resultSetMetaData?.rowType) {
-        tableData = { columns: rs.resultSetMetaData.rowType.map((c: any) => c.name), rows: rs.data };
+        const cols = rs.resultSetMetaData.rowType.map((c: any) => c.name);
+        const types = rs.resultSetMetaData.rowType.map((c: any) => c.type || '');
+        tableData = { columns: cols, rows: rs.data };
+        datasets.push({ columns: cols, types, rows: rs.data });
       }
     }
   }
 
-  // Store assistant response for multi-turn
-  conversationHistory.push({ role: 'assistant', content });
+  history.push({ role: 'assistant', content });
 
   return {
-    text: textParts.join('') || 'The agent processed your request but returned no text.',
+    text: textParts.join('') || (datasets.length > 0 ? '' : 'The agent processed your request but returned no text.'),
     toolTrace,
     sql,
     tableData,
+    datasets,
     requestId: result.request_id,
   };
 }

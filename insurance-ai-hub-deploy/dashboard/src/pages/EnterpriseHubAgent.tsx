@@ -1,0 +1,141 @@
+import { useState, useRef, useEffect } from 'react';
+import KPICard from '../components/dashboard/KPICard';
+import DataVisualizer, { type DataSet } from '../components/shared/DataVisualizer';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { Database, Search, BarChart3, CheckCircle2, Shield, Zap, Globe, DollarSign, Target, Bot, Send, User, Sparkles, X } from 'lucide-react';
+import { getToken } from '../services/snowflake-api';
+
+const AGENT = 'UNIFIED_ENTERPRISE_AGENT';
+const ACCENT = '#3b82f6';
+const COLORS = ['#3b82f6', '#22c55e', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899'];
+
+const TOOLS = [
+  { name: 'insurance_operations_analyst', type: 'Cortex Analyst', target: 'SV_INSURANCE_OPS', icon: Database, color: 'text-blue-500' },
+  { name: 'data_quality_analyst', type: 'Cortex Analyst', target: 'SV_DATA_QUALITY', icon: Shield, color: 'text-purple-500' },
+  { name: 'policy_document_search', type: 'Cortex Search', target: 'CORTEX_SEARCH_SVC', icon: Search, color: 'text-green-500' },
+  { name: 'competitive_intel_analyst', type: 'Cortex Analyst', target: 'SV_COMPETITIVE_INTEL', icon: DollarSign, color: 'text-emerald-500' },
+  { name: 'market_intelligence_analyst', type: 'Cortex Analyst', target: 'SV_MARKET_INTELLIGENCE', icon: Globe, color: 'text-violet-500' },
+  { name: 'product_matching_analyst', type: 'Cortex Analyst', target: 'SV_PRODUCT_MATCHING', icon: Target, color: 'text-orange-500' },
+  { name: 'data_to_chart', type: 'Built-in', target: 'Query Results', icon: BarChart3, color: 'text-cyan-500' },
+];
+
+const ROUTING = [
+  { name: 'Operations', value: 25 }, { name: 'Pricing', value: 20 }, { name: 'Market', value: 15 },
+  { name: 'Products', value: 15 }, { name: 'DQ', value: 10 }, { name: 'Docs', value: 10 }, { name: 'Jira', value: 5 },
+];
+
+const SUGGESTIONS = [
+  'What is the total premium revenue by policy type?',
+  'How does our pricing compare to competitors for Health?',
+  'What are the key market trends this quarter?',
+  'Which products best match our high-risk customers?',
+  'Which tables have the lowest data quality scores?',
+  'Create a Jira ticket to review Health pricing',
+];
+
+function getBaseUrl() { return import.meta.env.DEV ? '' : (import.meta.env.VITE_SNOWFLAKE_ACCOUNT_URL || ''); }
+
+interface ChatMsg { id: string; role: 'user' | 'assistant'; content: string; timestamp: Date; datasets?: DataSet[]; }
+
+function parseAgentContent(contentBlocks: any[]): { text: string; datasets: DataSet[] } {
+  const parts: string[] = [];
+  const datasets: DataSet[] = [];
+  for (const b of contentBlocks) {
+    if (b.type === 'text' && b.text) parts.push(b.text);
+    if (b.type === 'tool_result' || b.tool_result) {
+      const tr = b.tool_result || b;
+      const contents = Array.isArray(tr.content) ? tr.content : [tr.content || {}];
+      for (const c of contents) {
+        if (c.type === 'json' && c.json?.result_set?.data) {
+          const rs = c.json.result_set;
+          datasets.push({ columns: rs.resultSetMetaData?.rowType?.map((x: any) => x.name) || [], types: rs.resultSetMetaData?.rowType?.map((x: any) => x.type) || [], rows: rs.data });
+        }
+      }
+    }
+  }
+  return { text: parts.join('') || (datasets.length > 0 ? '' : 'No text returned.'), datasets };
+}
+
+export default function EnterpriseHubAgent() {
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+
+  const handleAsk = async (question?: string) => {
+    const text = (question || input).trim();
+    if (!text || isLoading) return;
+    setInput('');
+    setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'user', content: text, timestamp: new Date() }]);
+    setIsLoading(true);
+    try {
+      const token = getToken(); if (!token) throw new Error('Not authenticated');
+      const resp = await fetch(`${getBaseUrl()}/api/v2/databases/INSURANCE_AI_HUB/schemas/ANALYTICS/agents/${AGENT}:run`, {
+        method: 'POST', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Snowflake-Authorization-Token-Type': 'PROGRAMMATIC_ACCESS_TOKEN' },
+        body: JSON.stringify({ messages: [{ role: 'user', content: [{ type: 'text', text }] }], stream: false }),
+      });
+      if (!resp.ok) throw new Error(`Agent error ${resp.status}`);
+      const ct = resp.headers.get('content-type') || ''; let contentBlocks: any[] = [];
+      if (ct.includes('text/event-stream') || ct.includes('text/plain')) {
+        for (const line of (await resp.text()).split('\n')) { if (!line.startsWith('data: ')) continue; const p = line.slice(6).trim(); if (p === '[DONE]') break; try { const e = JSON.parse(p); if (e.delta?.content) contentBlocks.push(...e.delta.content); if (e.content) contentBlocks.push(...(Array.isArray(e.content) ? e.content : [e.content])); } catch {} }
+      } else { const r = await resp.json(); contentBlocks = r.content || []; if (typeof contentBlocks === 'string') contentBlocks = [{ type: 'text', text: contentBlocks }]; }
+      const { text: respText, datasets } = parseAgentContent(contentBlocks);
+      setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: respText, timestamp: new Date(), datasets }]);
+    } catch (err: any) { setMessages(prev => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: `**Error:** ${err.message}`, timestamp: new Date() }]); } finally { setIsLoading(false); }
+  };
+
+  return (
+    <div className="flex gap-4 h-[calc(100vh-8rem)]">
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center"><Shield className="w-5 h-5 text-blue-600" /></div>
+          <div><h1 className="text-xl font-bold text-gray-900 dark:text-white">Enterprise Hub Agent</h1><p className="text-sm text-gray-500 dark:text-slate-400">Unified 7-tool agent covering all 6 analytical domains + Jira integration</p></div>
+          <span className="ml-auto px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">{AGENT}</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KPICard label="Agent Status" value="LIVE" trend="up" subtitle="Auto + Analytical Search" />
+          <KPICard label="Tools" value="7" trend="stable" subtitle="6 Analyst + 1 Chart" />
+          <KPICard label="Semantic Views" value="5" trend="up" subtitle="All domains" />
+          <KPICard label="MCP" value="Atlassian" trend="up" subtitle="Jira + Confluence" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-5">
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Agent Tools (7 + MCP)</h3>
+            <div className="space-y-1.5">{TOOLS.map(t => (<div key={t.name} className="flex items-center justify-between p-2 rounded-lg bg-gray-50 dark:bg-slate-700/50"><div className="flex items-center gap-2"><t.icon className={`w-4 h-4 ${t.color}`} /><div><p className="text-xs font-medium text-gray-900 dark:text-white">{t.name}</p><p className="text-[10px] text-gray-500 dark:text-slate-400">{t.type} → {t.target}</p></div></div><span className="flex items-center gap-1 text-[10px] text-green-600"><CheckCircle2 className="w-3 h-3" />Active</span></div>))}
+              <div className="flex items-center justify-between p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800"><div className="flex items-center gap-2"><Zap className="w-4 h-4 text-orange-500" /><div><p className="text-xs font-medium text-gray-900 dark:text-white">Atlassian MCP</p><p className="text-[10px] text-gray-500">External MCP → Jira + Confluence</p></div></div><span className="flex items-center gap-1 text-[10px] text-orange-600"><CheckCircle2 className="w-3 h-3" />Connected</span></div>
+            </div>
+          </div>
+          <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-5">
+            <h3 className="font-semibold text-gray-900 dark:text-white mb-3">Expected Routing</h3>
+            <ResponsiveContainer width="100%" height={200}><PieChart><Pie data={ROUTING} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} label={({ name, percent }: any) => `${name} ${(percent * 100).toFixed(0)}%`}>{ROUTING.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+      {/* Chat Panel */}
+      <div className="w-[380px] flex-shrink-0 flex flex-col bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-slate-700">
+          <div className="flex items-center gap-3"><div className="relative"><div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center"><Shield className="w-4 h-4 text-white" /></div><div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-slate-800" /></div><div><h3 className="text-sm font-bold text-gray-900 dark:text-white">Enterprise Chat</h3><p className="text-[10px] text-blue-600 dark:text-blue-400">Cortex Agent · All Domains</p></div></div>
+          {messages.length > 0 && <button onClick={() => setMessages([])} className="text-xs text-gray-400 hover:text-red-500 flex items-center gap-1"><X className="w-3 h-3" />Clear</button>}
+        </div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin">
+          {messages.length === 0 && (<div className="flex flex-col items-center justify-center h-full text-center px-3"><Sparkles className="w-10 h-10 text-blue-300 dark:text-blue-700 mb-3" /><h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">Ask Anything</h4><p className="text-xs text-gray-500 dark:text-slate-400 mb-4">Covers all 6 domains, charts, and Jira integration.</p><div className="space-y-2 w-full">{SUGGESTIONS.map((s, i) => (<button key={i} onClick={() => handleAsk(s)} className="w-full text-left px-3 py-2 rounded-lg border border-gray-200 dark:border-slate-700 text-xs text-gray-600 dark:text-slate-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 transition-colors">{s}</button>))}</div></div>)}
+          {messages.map(msg => (
+            <div key={msg.id} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+              {msg.role === 'assistant' && <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center flex-shrink-0 mt-1"><Bot className="w-3 h-3 text-white" /></div>}
+              <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed ${msg.role === 'user' ? 'bg-brand-600 text-white' : 'bg-gray-50 dark:bg-slate-700/50 text-gray-700 dark:text-slate-300 border border-gray-200 dark:border-slate-600'}`}>
+                {msg.content && <div className="whitespace-pre-wrap">{msg.content}</div>}
+                {msg.datasets && msg.datasets.map((ds, di) => <DataVisualizer key={di} dataset={ds} accentColor={ACCENT} />)}
+                <div className="mt-1 text-[9px] opacity-40">{msg.timestamp.toLocaleTimeString()}</div>
+              </div>
+              {msg.role === 'user' && <div className="w-6 h-6 rounded-lg bg-brand-600 flex items-center justify-center flex-shrink-0 mt-1"><User className="w-3 h-3 text-white" /></div>}
+            </div>
+          ))}
+          {isLoading && <div className="flex gap-2"><div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center flex-shrink-0"><Bot className="w-3 h-3 text-white animate-pulse" /></div><div className="bg-gray-50 dark:bg-slate-700/50 border rounded-2xl px-3 py-2"><p className="text-[10px] text-gray-500 mb-1">Processing...</p><div className="flex gap-1"><div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} /><div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} /><div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} /></div></div></div>}
+          <div ref={bottomRef} />
+        </div>
+        <div className="border-t border-gray-200 dark:border-slate-700 p-3"><div className="flex items-center bg-gray-50 dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600 focus-within:ring-2 focus-within:ring-blue-500"><input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleAsk()} placeholder="Ask the Enterprise Hub..." className="flex-1 px-3 py-2.5 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none" disabled={isLoading} /><button onClick={() => handleAsk()} disabled={!input.trim() || isLoading} className="p-2.5 text-blue-600 hover:text-blue-700 disabled:opacity-30"><Send className="w-4 h-4" /></button></div></div>
+      </div>
+    </div>
+  );
+}

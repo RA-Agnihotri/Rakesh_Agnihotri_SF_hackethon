@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Trash2, Bot, User, Sparkles, ChevronDown, ChevronRight, Database, Search, FileCode, Zap, Clock, CheckCircle2 } from 'lucide-react';
+import { Send, Trash2, Bot, User, Sparkles, ChevronDown, ChevronRight, Database, Search, FileCode, Zap, Clock, CheckCircle2, Mic, MicOff, Languages, Loader2 } from 'lucide-react';
 import { useChatStore } from '../stores';
 import { runAgentQuery, clearConversation, type AgentResponse, type ToolTraceItem, type ResultDataSet } from '../services/cortex-agent';
 import DataVisualizer from '../components/shared/DataVisualizer';
 import { SNOWFLAKE_CONFIG } from '../lib/constants';
+import { useVoiceInput } from '../hooks/useVoiceInput';
+import { detectAndTranslate, type TranslationResult } from '../services/translate';
 
 const AGENT_NAME = 'INSURANCE_INTELLIGENCE_AGENT';
 const AGENT_FQN = SNOWFLAKE_CONFIG.agentFqn;
@@ -49,7 +51,25 @@ export default function AIAssistant() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showAgentInfo, setShowAgentInfo] = useState(true);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationInfo, setTranslationInfo] = useState<TranslationResult | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const handleVoiceResult = async (text: string) => {
+    setIsTranslating(true);
+    setTranslationInfo(null);
+    try {
+      const result = await detectAndTranslate(text);
+      setInput(result.translatedText);
+      if (result.wasTranslated) setTranslationInfo(result);
+    } catch {
+      setInput(text);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  const voice = useVoiceInput(handleVoiceResult);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
@@ -57,6 +77,7 @@ export default function AIAssistant() {
     const q = (question || input).trim();
     if (!q || isLoading) return;
     setInput('');
+    setTranslationInfo(null);
 
     const userMsg: ChatMsg = { id: crypto.randomUUID(), role: 'user', content: q, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
@@ -214,6 +235,31 @@ export default function AIAssistant() {
 
         {/* Input */}
         <div className="border-t border-gray-200 dark:border-slate-700 p-4 bg-white dark:bg-slate-800 rounded-b-xl">
+          {/* Voice / Translation status bar */}
+          {(voice.state === 'recording' || isTranslating || voice.error || translationInfo) && (
+            <div className="mb-2 flex items-center gap-2 text-xs">
+              {voice.state === 'recording' && (
+                <span className="flex items-center gap-1.5 text-red-500 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                  Listening... {voice.interimTranscript && <span className="text-gray-400 dark:text-slate-500 font-normal italic truncate max-w-xs">"{voice.transcript}{voice.interimTranscript}"</span>}
+                </span>
+              )}
+              {isTranslating && (
+                <span className="flex items-center gap-1.5 text-blue-500 font-medium">
+                  <Loader2 className="w-3 h-3 animate-spin" /> Detecting language &amp; translating...
+                </span>
+              )}
+              {voice.error && (
+                <span className="text-red-500">{voice.error}</span>
+              )}
+              {translationInfo && !isTranslating && (
+                <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                  <Languages className="w-3 h-3" /> Translated from: "{translationInfo.originalText}"
+                </span>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-2">
             {messages.length > 0 && (
               <button onClick={handleClear} className="p-3 rounded-xl border border-gray-200 dark:border-slate-700 text-gray-400 hover:text-red-500 transition-colors" title="Clear conversation">
@@ -223,12 +269,34 @@ export default function AIAssistant() {
             <div className="flex-1 flex items-center bg-gray-50 dark:bg-slate-700 rounded-xl border border-gray-200 dark:border-slate-600 focus-within:ring-2 focus-within:ring-brand-500 focus-within:border-brand-500">
               <input
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => { setInput(e.target.value); setTranslationInfo(null); }}
                 onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-                placeholder={`Ask ${AGENT_NAME} about insurance data...`}
+                placeholder={voice.state === 'recording' ? 'Listening...' : `Ask ${AGENT_NAME} about insurance data...`}
                 className="flex-1 px-4 py-3 bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none"
-                disabled={isLoading}
+                disabled={isLoading || voice.state === 'recording'}
               />
+
+              {/* Microphone button */}
+              {voice.isSupported && (
+                <button
+                  onClick={voice.state === 'recording' ? voice.stopRecording : voice.startRecording}
+                  disabled={isLoading || isTranslating}
+                  className={`p-3 transition-colors ${
+                    voice.state === 'recording'
+                      ? 'text-red-500 hover:text-red-600'
+                      : 'text-gray-400 hover:text-brand-600'
+                  } disabled:opacity-30`}
+                  title={voice.state === 'recording' ? 'Stop recording' : 'Voice input'}
+                >
+                  {voice.state === 'recording'
+                    ? <MicOff className="w-5 h-5" />
+                    : isTranslating
+                      ? <Loader2 className="w-5 h-5 animate-spin" />
+                      : <Mic className="w-5 h-5" />
+                  }
+                </button>
+              )}
+
               <button onClick={() => handleSend()} disabled={!input.trim() || isLoading}
                 className="p-3 text-brand-600 hover:text-brand-700 disabled:opacity-30">
                 <Send className="w-5 h-5" />
@@ -285,6 +353,7 @@ export default function AIAssistant() {
             <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-green-500" /> Multi-turn conversation</li>
             <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-green-500" /> Cross-domain reasoning</li>
             <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-green-500" /> Source citations</li>
+            <li className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-green-500" /> Voice input with auto-translation</li>
           </ul>
 
           {/* Data Sources */}
