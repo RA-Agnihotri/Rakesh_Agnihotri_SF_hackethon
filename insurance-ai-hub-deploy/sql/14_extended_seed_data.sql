@@ -1,6 +1,7 @@
 -- ============================================================================
 -- INSURANCE AI HUB - Enhancement Deployment
 -- Script 14: Seed Data for Extended Tables (~400 rows)
+-- NOTE: This script is IDEMPOTENT — it truncates before inserting.
 -- ============================================================================
 -- Run as: ACCOUNTADMIN
 -- Depends on: 10_extended_tables.sql
@@ -9,6 +10,13 @@
 USE ROLE ACCOUNTADMIN;
 USE DATABASE INSURANCE_AI_HUB;
 USE SCHEMA ANALYTICS;
+
+-- Truncate extended tables in reverse-dependency order
+TRUNCATE TABLE IF EXISTS INSURANCE_AI_HUB.ANALYTICS.PRICING_SCENARIOS;
+TRUNCATE TABLE IF EXISTS INSURANCE_AI_HUB.ANALYTICS.PRODUCT_MATCH_SCORES;
+TRUNCATE TABLE IF EXISTS INSURANCE_AI_HUB.ANALYTICS.MARKET_TRENDS;
+TRUNCATE TABLE IF EXISTS INSURANCE_AI_HUB.ANALYTICS.COMPETITOR_PRICING;
+TRUNCATE TABLE IF EXISTS INSURANCE_AI_HUB.ANALYTICS.PRODUCT_CATALOG;
 
 -- ############################################################################
 -- PRODUCT_CATALOG (20 products)

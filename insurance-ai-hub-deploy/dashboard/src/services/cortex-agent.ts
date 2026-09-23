@@ -1,6 +1,8 @@
 import { SNOWFLAKE_CONFIG } from '../lib/constants';
 import { getToken } from './snowflake-api';
 
+const AGENT_TIMEOUT_MS = 120_000; // 2-minute timeout for agent requests
+
 function getBaseUrl(): string {
   if (import.meta.env.DEV) return '';
   return SNOWFLAKE_CONFIG.accountUrl;
@@ -55,21 +57,34 @@ export async function runAgentQuery(question: string, agentName: string = 'INSUR
   });
 
   const baseUrl = getBaseUrl();
-  const agentUrl = `${baseUrl}/api/v2/databases/INSURANCE_AI_HUB/schemas/ANALYTICS/agents/${agentName}:run`;
+  const agentUrl = `${baseUrl}/api/v2/databases/${SNOWFLAKE_CONFIG.database}/schemas/${SNOWFLAKE_CONFIG.schema}/agents/${agentName}:run`;
 
-  const resp = await fetch(agentUrl, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'X-Snowflake-Authorization-Token-Type': 'PROGRAMMATIC_ACCESS_TOKEN',
-    },
-    body: JSON.stringify({
-      messages: history,
-      stream: false,
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), AGENT_TIMEOUT_MS);
+
+  let resp: Response;
+  try {
+    resp = await fetch(agentUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Snowflake-Authorization-Token-Type': 'PROGRAMMATIC_ACCESS_TOKEN',
+      },
+      body: JSON.stringify({
+        messages: history,
+        stream: false,
+      }),
+      signal: controller.signal,
+    });
+  } catch (err: any) {
+    history.pop();
+    if (err.name === 'AbortError') throw new Error('Agent request timed out after 2 minutes.');
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!resp.ok) {
     const errText = await resp.text();

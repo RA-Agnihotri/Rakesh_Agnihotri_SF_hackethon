@@ -83,6 +83,21 @@ CREATE RESOURCE MONITOR IF NOT EXISTS INSURANCE_AI_HUB_MONITOR
 ALTER WAREHOUSE COMPUTE_WH SET RESOURCE_MONITOR = INSURANCE_AI_HUB_MONITOR;
 
 -- ############################################################################
+-- SECTION 4b: Budget (Serverless AI cost guardrail)
+-- Resource monitors only cover warehouse credits. Cortex AI inference,
+-- Cortex Search, and serverless tasks are billed as serverless credits
+-- outside of warehouses. A budget caps ALL credit types.
+-- Adjust spending_limit to your monthly AI budget.
+-- ############################################################################
+
+CREATE SNOWFLAKE.CORE.BUDGET IF NOT EXISTS INSURANCE_AI_HUB_BUDGET();
+CALL INSURANCE_AI_HUB_BUDGET!SET_SPENDING_LIMIT(1000);
+-- Adds the warehouse to the budget so BOTH warehouse + serverless are tracked
+CALL INSURANCE_AI_HUB_BUDGET!ADD_RESOURCE(
+  SYSTEM$REFERENCE('WAREHOUSE', 'COMPUTE_WH')
+);
+
+-- ############################################################################
 -- SECTION 5: Grant database access to service role
 -- ############################################################################
 

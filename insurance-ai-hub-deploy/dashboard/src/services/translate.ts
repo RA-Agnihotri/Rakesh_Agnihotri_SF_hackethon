@@ -1,4 +1,4 @@
-import { executeSQL } from './snowflake-api';
+import { executeSQLWithBindings } from './snowflake-api';
 
 export interface TranslationResult {
   originalText: string;
@@ -7,13 +7,13 @@ export interface TranslationResult {
 }
 
 export async function detectAndTranslate(text: string): Promise<TranslationResult> {
-  const escaped = text.replace(/'/g, "''");
-
   try {
     // AI_TRANSLATE with empty source language auto-detects and translates to English.
-    // If the text is already English, the output will be ~identical.
-    const result = await executeSQL(
-      `SELECT AI_TRANSLATE('${escaped}', '', 'en') AS translated`
+    // Uses parameterized binding (?) to prevent SQL injection — user text never
+    // touches the SQL string.
+    const result = await executeSQLWithBindings(
+      `SELECT AI_TRANSLATE(?, '', 'en') AS translated`,
+      [{ type: 'TEXT', value: text }]
     );
 
     const translated: string = result.data?.[0]?.[0] ?? text;

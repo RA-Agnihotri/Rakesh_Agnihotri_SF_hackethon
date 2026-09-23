@@ -14,6 +14,38 @@ USE DATABASE INSURANCE_AI_HUB;
 -- ############################################################################
 
 CREATE OR REPLACE VIEW ANALYTICS.VW_CUSTOMER_360 AS
+WITH policy_agg AS (
+    SELECT CUSTOMER_ID,
+           COUNT(DISTINCT POLICY_ID) AS policy_count,
+           SUM(PREMIUM_AMOUNT) AS total_premium,
+           SUM(COVERAGE_AMOUNT) AS total_coverage
+    FROM INSURANCE_AI_HUB.ANALYTICS.POLICIES
+    GROUP BY CUSTOMER_ID
+),
+claim_agg AS (
+    SELECT CUSTOMER_ID,
+           COUNT(DISTINCT CLAIM_ID) AS claim_count,
+           SUM(CLAIM_AMOUNT) AS total_claim_amount,
+           SUM(CASE WHEN FRAUD_FLAG THEN 1 ELSE 0 END) AS fraud_flagged_claims,
+           AVG(FRAUD_SCORE) AS avg_fraud_score
+    FROM INSURANCE_AI_HUB.ANALYTICS.CLAIMS
+    GROUP BY CUSTOMER_ID
+),
+billing_agg AS (
+    SELECT CUSTOMER_ID,
+           SUM(OUTSTANDING_BALANCE) AS total_outstanding,
+           SUM(LATE_FEE) AS total_late_fees
+    FROM INSURANCE_AI_HUB.ANALYTICS.BILLING
+    GROUP BY CUSTOMER_ID
+),
+risk_agg AS (
+    SELECT CUSTOMER_ID,
+           MAX(RISK_SCORE) AS max_risk_score,
+           MAX(CHURN_PROBABILITY) AS max_churn_probability,
+           SUM(REVENUE_AT_RISK) AS total_revenue_at_risk
+    FROM INSURANCE_AI_HUB.ANALYTICS.AT_RISK_POLICIES
+    GROUP BY CUSTOMER_ID
+)
 SELECT
     c.CUSTOMER_ID,
     c.FIRST_NAME,
@@ -25,24 +57,23 @@ SELECT
     c.CREDIT_SCORE,
     c.SEGMENT,
     c.CUSTOMER_SINCE,
-    COUNT(DISTINCT p.POLICY_ID) AS policy_count,
-    SUM(p.PREMIUM_AMOUNT) AS total_premium,
-    SUM(p.COVERAGE_AMOUNT) AS total_coverage,
-    COUNT(DISTINCT cl.CLAIM_ID) AS claim_count,
-    SUM(cl.CLAIM_AMOUNT) AS total_claim_amount,
-    SUM(CASE WHEN cl.FRAUD_FLAG THEN 1 ELSE 0 END) AS fraud_flagged_claims,
-    AVG(cl.FRAUD_SCORE) AS avg_fraud_score,
-    SUM(b.OUTSTANDING_BALANCE) AS total_outstanding,
-    SUM(b.LATE_FEE) AS total_late_fees,
-    MAX(ar.RISK_SCORE) AS max_risk_score,
-    MAX(ar.CHURN_PROBABILITY) AS max_churn_probability,
-    SUM(ar.REVENUE_AT_RISK) AS total_revenue_at_risk
+    COALESCE(p.policy_count, 0) AS policy_count,
+    COALESCE(p.total_premium, 0) AS total_premium,
+    COALESCE(p.total_coverage, 0) AS total_coverage,
+    COALESCE(cl.claim_count, 0) AS claim_count,
+    COALESCE(cl.total_claim_amount, 0) AS total_claim_amount,
+    COALESCE(cl.fraud_flagged_claims, 0) AS fraud_flagged_claims,
+    cl.avg_fraud_score,
+    COALESCE(b.total_outstanding, 0) AS total_outstanding,
+    COALESCE(b.total_late_fees, 0) AS total_late_fees,
+    ar.max_risk_score,
+    ar.max_churn_probability,
+    COALESCE(ar.total_revenue_at_risk, 0) AS total_revenue_at_risk
 FROM INSURANCE_AI_HUB.ANALYTICS.CUSTOMERS c
-LEFT JOIN INSURANCE_AI_HUB.ANALYTICS.POLICIES p ON c.CUSTOMER_ID = p.CUSTOMER_ID
-LEFT JOIN INSURANCE_AI_HUB.ANALYTICS.CLAIMS cl ON c.CUSTOMER_ID = cl.CUSTOMER_ID
-LEFT JOIN INSURANCE_AI_HUB.ANALYTICS.BILLING b ON c.CUSTOMER_ID = b.CUSTOMER_ID
-LEFT JOIN INSURANCE_AI_HUB.ANALYTICS.AT_RISK_POLICIES ar ON c.CUSTOMER_ID = ar.CUSTOMER_ID
-GROUP BY 1,2,3,4,5,6,7,8,9,10;
+LEFT JOIN policy_agg p ON c.CUSTOMER_ID = p.CUSTOMER_ID
+LEFT JOIN claim_agg cl ON c.CUSTOMER_ID = cl.CUSTOMER_ID
+LEFT JOIN billing_agg b ON c.CUSTOMER_ID = b.CUSTOMER_ID
+LEFT JOIN risk_agg ar ON c.CUSTOMER_ID = ar.CUSTOMER_ID;
 
 
 -- ############################################################################

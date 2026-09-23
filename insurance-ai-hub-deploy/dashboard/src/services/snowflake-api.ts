@@ -102,6 +102,56 @@ async function pollResult(handle: string, token: string, maxAttempts = 60): Prom
   throw new Error('Query timed out');
 }
 
+// Parameterized SQL execution — use this for any query with user-supplied values.
+// Bindings prevent SQL injection by sending values out-of-band from the SQL text.
+export async function executeSQLWithBindings(
+  sql: string,
+  bindings: Record<string, { type: string; value: string }> | Array<{ type: string; value: string }>
+): Promise<any> {
+  const token = getToken();
+  if (!token) throw new Error('Not authenticated. Please enter your PAT token.');
+
+  const baseUrl = getBaseUrl();
+
+  // Convert array bindings to positional map: {"1": {...}, "2": {...}}
+  let bindingsMap: Record<string, { type: string; value: string }>;
+  if (Array.isArray(bindings)) {
+    bindingsMap = {};
+    bindings.forEach((b, i) => { bindingsMap[String(i + 1)] = b; });
+  } else {
+    bindingsMap = bindings;
+  }
+
+  const resp = await fetchWithRetry(`${baseUrl}/api/v2/statements?async=false`, {
+    method: 'POST',
+    headers: getAuthHeaders(token),
+    body: JSON.stringify({
+      statement: sql,
+      warehouse: SNOWFLAKE_CONFIG.warehouse,
+      database: SNOWFLAKE_CONFIG.database,
+      schema: SNOWFLAKE_CONFIG.schema,
+      role: SNOWFLAKE_CONFIG.role,
+      timeout: 120,
+      bindings: bindingsMap,
+    }),
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    if (resp.status === 401 || resp.status === 403) {
+      clearToken();
+      throw new Error('Authentication failed. Please check your PAT token.');
+    }
+    throw new Error(err.message || `SQL API error: ${resp.status}`);
+  }
+
+  const result = await resp.json();
+  if (result.statementStatusUrl && !result.data) {
+    return pollResult(result.statementHandle, token);
+  }
+  return parseResult(result);
+}
+
 function parseResult(result: any) {
   const columns = result.resultSetMetaData?.rowType?.map((c: any) => ({
     name: c.name,

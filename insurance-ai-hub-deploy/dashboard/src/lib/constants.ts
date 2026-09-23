@@ -3,6 +3,6 @@ export const SNOWFLAKE_CONFIG = {
   warehouse: import.meta.env.VITE_SNOWFLAKE_WAREHOUSE || 'COMPUTE_WH',
   database: import.meta.env.VITE_SNOWFLAKE_DATABASE || 'INSURANCE_AI_HUB',
   schema: import.meta.env.VITE_SNOWFLAKE_SCHEMA || 'ANALYTICS',
-  role: import.meta.env.VITE_SNOWFLAKE_ROLE || 'ACCOUNTADMIN',
-  agentFqn: 'INSURANCE_AI_HUB.ANALYTICS.INSURANCE_INTELLIGENCE_AGENT',
+  role: import.meta.env.VITE_SNOWFLAKE_ROLE || 'INSURANCE_SERVICE_ROLE',
+  sessionTimeoutMs: 30 * 60 * 1000, // 30-minute inactivity timeout
 };

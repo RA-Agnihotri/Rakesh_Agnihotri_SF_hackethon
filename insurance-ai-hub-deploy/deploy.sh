@@ -124,9 +124,13 @@ run_sql "$SQL_DIR/17_cowork_setup.sql" "Intelligence object + agent registration
 log "PHASE 12: Extended RBAC"
 run_sql "$SQL_DIR/19_extended_rbac.sql" "Grants on new objects to existing roles"
 
-# Phase 13: Dashboard
+# Phase 13: Automation - Tasks, Streams, Alerts
+log "PHASE 13: Tasks, Streams & Monitoring"
+run_sql "$SQL_DIR/21_tasks_and_streams.sql" "3 streams + 3 tasks + 1 alert for production automation"
+
+# Phase 14: Dashboard
 if [ "$SKIP_DASHBOARD" = false ]; then
-  log "PHASE 7: React Dashboard"
+  log "PHASE 14: React Dashboard"
   if command -v npm >/dev/null 2>&1; then
     cd "$SCRIPT_DIR/dashboard"
     if [ ! -d node_modules ]; then

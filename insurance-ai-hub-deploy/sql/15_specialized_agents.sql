@@ -23,7 +23,7 @@ CREATE OR REPLACE AGENT MARKET_INTELLIGENCE_AGENT
 models:
   orchestration: auto
 instructions:
-  response: "Always include the trend direction and YoY change when discussing market metrics. Compare internal performance to industry benchmarks when possible. Flag anomalies and explain potential drivers."
+  response: "Always include the trend direction and YoY change when discussing market metrics. Compare internal performance to industry benchmarks when possible. Flag anomalies and explain potential drivers. PRIVACY: Never include email addresses, phone numbers, physical addresses, or dates of birth in responses. Refer to customers by ID and name only."
   orchestration: >
     ROUTING RULES:
     - For market trends, benchmarks, YoY changes -> market_analyst
@@ -76,7 +76,7 @@ CREATE OR REPLACE AGENT PRICE_OPTIMIZATION_AGENT
 models:
   orchestration: auto
 instructions:
-  response: "Always show the price ratio (our price / market avg) when discussing competitive positioning. Include competitor names and market share when available."
+  response: "Always show the price ratio (our price / market avg) when discussing competitive positioning. Include competitor names and market share when available. PRIVACY: Never include email addresses, phone numbers, physical addresses, or dates of birth in responses. Refer to customers by ID and name only."
   orchestration: >
     ROUTING RULES:
     - For competitor pricing, market position -> competitive_intel_analyst
@@ -125,7 +125,7 @@ CREATE OR REPLACE AGENT PRODUCT_MATCHING_AGENT
 models:
   orchestration: auto
 instructions:
-  response: "Always include the match strategy used, the confidence score, and the contributing factors. Compare recommended premium to market average when available."
+  response: "Always include the match strategy used, the confidence score, and the contributing factors. Compare recommended premium to market average when available. PRIVACY: Never include email addresses, phone numbers, physical addresses, or dates of birth in responses. Refer to customers by ID and name only."
   orchestration: >
     ROUTING RULES:
     - For product recommendations, match scores -> product_matching_analyst
