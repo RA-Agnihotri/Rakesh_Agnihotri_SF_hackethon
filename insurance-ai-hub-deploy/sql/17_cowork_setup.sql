@@ -13,6 +13,9 @@ USE ROLE ACCOUNTADMIN;
 
 -- ############################################################################
 -- Enable cross-region inference for Cortex AI
+-- WARNING: This is an ACCOUNT-LEVEL setting affecting ALL workloads.
+-- Prefer scoping to specific regions if possible. A resource monitor
+-- (created in 00_setup.sql) caps runaway AI credit consumption.
 -- ############################################################################
 
 ALTER ACCOUNT SET CORTEX_ENABLED_CROSS_REGION = 'ANY_REGION';
@@ -51,12 +54,13 @@ ALTER SNOWFLAKE INTELLIGENCE SNOWFLAKE_INTELLIGENCE_OBJECT_DEFAULT
 -- ############################################################################
 -- Grant USAGE on CoWork object to roles
 -- Without USAGE, roles cannot see agents in CoWork even if they have
--- USAGE on the agents themselves
+-- USAGE on the agents themselves.
+-- NOTE: Do NOT grant to PUBLIC — it would expose all registered agents
+-- (including those with MCP/Jira write access) to every account user.
 -- ############################################################################
 
 GRANT USAGE ON SNOWFLAKE INTELLIGENCE SNOWFLAKE_INTELLIGENCE_OBJECT_DEFAULT TO ROLE ACCOUNTADMIN;
 GRANT USAGE ON SNOWFLAKE INTELLIGENCE SNOWFLAKE_INTELLIGENCE_OBJECT_DEFAULT TO ROLE SYSADMIN;
-GRANT USAGE ON SNOWFLAKE INTELLIGENCE SNOWFLAKE_INTELLIGENCE_OBJECT_DEFAULT TO ROLE PUBLIC;
 
 -- ############################################################################
 -- Verification

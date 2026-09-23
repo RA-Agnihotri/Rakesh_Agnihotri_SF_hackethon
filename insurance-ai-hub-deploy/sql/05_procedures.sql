@@ -70,22 +70,78 @@ CREATE OR REPLACE PROCEDURE ANALYTICS.SP_TREND_DETECTOR(
 RETURNS VARIANT
 LANGUAGE JAVASCRIPT
 EXECUTE AS CALLER
-AS '
-  if (P_METRIC_NAME === ''claims_amount'') {
-    var sql = `SELECT OBJECT_CONSTRUCT(''metric'',''claims_amount'',''lookback_days'',` + P_LOOKBACK_DAYS + `,''dimension'',COALESCE(''` + (P_DIMENSION || ''overall'') + `'',''overall''),''data_points'',(SELECT ARRAY_AGG(OBJECT_CONSTRUCT(''period'',grp_period::VARCHAR,''value'',grp_value,''count'',grp_count)) FROM (SELECT DATE_TRUNC(''week'',CLAIM_DATE) AS grp_period, SUM(CLAIM_AMOUNT) AS grp_value, COUNT(*) AS grp_count FROM INSURANCE_AI_HUB.ANALYTICS.CLAIMS WHERE CLAIM_DATE >= DATEADD(DAY,-` + P_LOOKBACK_DAYS + `,CURRENT_DATE()) GROUP BY 1 ORDER BY 1))) AS result`;
-    var rs = snowflake.execute({sqlText: sql});
+AS
+$$
+  var metricName = P_METRIC_NAME;
+  var dimension = P_DIMENSION || 'overall';
+  var lookbackDays = Math.max(1, Math.min(Math.floor(P_LOOKBACK_DAYS), 3650));
+
+  if (metricName === 'claims_amount') {
+    var sql = `SELECT OBJECT_CONSTRUCT(
+        'metric', 'claims_amount',
+        'lookback_days', ?,
+        'dimension', ?,
+        'data_points', (
+          SELECT ARRAY_AGG(OBJECT_CONSTRUCT(
+            'period', grp_period::VARCHAR,
+            'value', grp_value,
+            'count', grp_count
+          ))
+          FROM (
+            SELECT DATE_TRUNC('week', CLAIM_DATE) AS grp_period,
+                   SUM(CLAIM_AMOUNT) AS grp_value,
+                   COUNT(*) AS grp_count
+            FROM INSURANCE_AI_HUB.ANALYTICS.CLAIMS
+            WHERE CLAIM_DATE >= DATEADD(DAY, -?, CURRENT_DATE())
+            GROUP BY 1 ORDER BY 1
+          )
+        )
+      ) AS result`;
+    var rs = snowflake.createStatement({sqlText: sql, binds: [lookbackDays, dimension, lookbackDays]}).execute();
     if (rs.next()) return rs.getColumnValue(1);
-  } else if (P_METRIC_NAME === ''dq_score'') {
-    var sql = `SELECT OBJECT_CONSTRUCT(''metric'',''dq_score'',''data_points'',(SELECT ARRAY_AGG(OBJECT_CONSTRUCT(''table_name'',TABLE_NAME,''score_date'',SCORE_DATE::VARCHAR,''overall_score'',OVERALL_SCORE,''trend'',TREND)) FROM INSURANCE_AI_HUB.DATA_QUALITY.DQ_SCORES ORDER BY TABLE_NAME, SCORE_DATE)) AS result`;
-    var rs = snowflake.execute({sqlText: sql});
+
+  } else if (metricName === 'dq_score') {
+    var sql = `SELECT OBJECT_CONSTRUCT(
+        'metric', 'dq_score',
+        'data_points', (
+          SELECT ARRAY_AGG(OBJECT_CONSTRUCT(
+            'table_name', TABLE_NAME,
+            'score_date', SCORE_DATE::VARCHAR,
+            'overall_score', OVERALL_SCORE,
+            'trend', TREND
+          ))
+          FROM INSURANCE_AI_HUB.DATA_QUALITY.DQ_SCORES
+          ORDER BY TABLE_NAME, SCORE_DATE
+        )
+      ) AS result`;
+    var rs = snowflake.createStatement({sqlText: sql}).execute();
     if (rs.next()) return rs.getColumnValue(1);
-  } else if (P_METRIC_NAME === ''premium'') {
-    var sql = `SELECT OBJECT_CONSTRUCT(''metric'',''premium'',''data_points'',(SELECT ARRAY_AGG(OBJECT_CONSTRUCT(''policy_type'',POLICY_TYPE,''total_premium'',grp_premium,''policy_count'',grp_count)) FROM (SELECT POLICY_TYPE, SUM(PREMIUM_AMOUNT) AS grp_premium, COUNT(*) AS grp_count FROM INSURANCE_AI_HUB.ANALYTICS.POLICIES WHERE POLICY_STATUS=''Active'' GROUP BY 1))) AS result`;
-    var rs = snowflake.execute({sqlText: sql});
+
+  } else if (metricName === 'premium') {
+    var sql = `SELECT OBJECT_CONSTRUCT(
+        'metric', 'premium',
+        'data_points', (
+          SELECT ARRAY_AGG(OBJECT_CONSTRUCT(
+            'policy_type', POLICY_TYPE,
+            'total_premium', grp_premium,
+            'policy_count', grp_count
+          ))
+          FROM (
+            SELECT POLICY_TYPE,
+                   SUM(PREMIUM_AMOUNT) AS grp_premium,
+                   COUNT(*) AS grp_count
+            FROM INSURANCE_AI_HUB.ANALYTICS.POLICIES
+            WHERE POLICY_STATUS = 'Active'
+            GROUP BY 1
+          )
+        )
+      ) AS result`;
+    var rs = snowflake.createStatement({sqlText: sql}).execute();
     if (rs.next()) return rs.getColumnValue(1);
   }
-  return {"error": "Unsupported metric: " + P_METRIC_NAME, "supported_metrics": ["claims_amount","premium","dq_score"]};
-';
+
+  return {error: "Unsupported metric: " + metricName, supported_metrics: ["claims_amount", "premium", "dq_score"]};
+$$;
 
 
 -- ############################################################################

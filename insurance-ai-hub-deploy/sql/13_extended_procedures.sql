@@ -24,11 +24,11 @@ AS
 $$
   var customerId = P_CUSTOMER_ID;
 
-  // Get customer profile
+  // Get customer profile — uses bind parameter to prevent SQL injection
   var custQuery = `SELECT RISK_TIER, CREDIT_SCORE, SEGMENT,
                           TIMESTAMPDIFF(YEAR, DATE_OF_BIRTH, CURRENT_DATE()) AS AGE
-                   FROM CUSTOMERS WHERE CUSTOMER_ID = '${customerId}'`;
-  var custStmt = snowflake.createStatement({sqlText: custQuery});
+                   FROM CUSTOMERS WHERE CUSTOMER_ID = ?`;
+  var custStmt = snowflake.createStatement({sqlText: custQuery, binds: [customerId]});
   var custResult = custStmt.execute();
 
   if (!custResult.next()) {
@@ -123,25 +123,33 @@ $$
   var policyType = P_POLICY_TYPE;
   var region = P_REGION;
 
-  // Get our current pricing
+  // Get our current pricing — bind parameters to prevent SQL injection
+  var ourBinds = [policyType];
   var ourQuery = `SELECT AVG(PREMIUM_AMOUNT) AS AVG_PREMIUM, COUNT(*) AS POLICY_COUNT,
                          AVG(LOSS_RATIO) AS AVG_LOSS_RATIO
-                  FROM POLICIES WHERE POLICY_TYPE = '${policyType}' AND POLICY_STATUS = 'Active'
-                  ${region ? "AND POLICY_ID IN (SELECT POLICY_ID FROM POLICIES WHERE POLICY_TYPE = '" + policyType + "')" : ""}`;
-  var ourStmt = snowflake.createStatement({sqlText: ourQuery});
+                  FROM POLICIES WHERE POLICY_TYPE = ? AND POLICY_STATUS = 'Active'`;
+  if (region) {
+    ourQuery += ` AND AGENT_ID IN (SELECT AGENT_ID FROM AGENTS WHERE REGION = ?)`;
+    ourBinds.push(region);
+  }
+  var ourStmt = snowflake.createStatement({sqlText: ourQuery, binds: ourBinds});
   var ourResult = ourStmt.execute();
   ourResult.next();
   var ourAvgPremium = ourResult.getColumnValue('AVG_PREMIUM');
   var policyCount = ourResult.getColumnValue('POLICY_COUNT');
   var ourLossRatio = ourResult.getColumnValue('AVG_LOSS_RATIO');
 
-  // Get competitor pricing
+  // Get competitor pricing — bind parameters to prevent SQL injection
+  var compBinds = [policyType];
   var compQuery = `SELECT COMPETITOR_NAME, AVG(AVG_PREMIUM) AS AVG_PREMIUM,
                           AVG(MARKET_SHARE_PCT) AS MARKET_SHARE, AVG(CLAIMS_RATIO) AS LOSS_RATIO
-                   FROM COMPETITOR_PRICING WHERE POLICY_TYPE = '${policyType}'
-                   ${region ? "AND REGION = '" + region + "'" : ""}
-                   GROUP BY COMPETITOR_NAME ORDER BY AVG_PREMIUM`;
-  var compStmt = snowflake.createStatement({sqlText: compQuery});
+                   FROM COMPETITOR_PRICING WHERE POLICY_TYPE = ?`;
+  if (region) {
+    compQuery += ` AND REGION = ?`;
+    compBinds.push(region);
+  }
+  compQuery += ` GROUP BY COMPETITOR_NAME ORDER BY AVG_PREMIUM`;
+  var compStmt = snowflake.createStatement({sqlText: compQuery, binds: compBinds});
   var compResult = compStmt.execute();
 
   var competitors = [];
@@ -214,15 +222,20 @@ $$
   var metricName = P_METRIC_NAME;
   var policyType = P_POLICY_TYPE;
 
+  // Build query with bind parameters to prevent SQL injection
+  var binds = [metricName];
   var query = `SELECT TREND_ID, METRIC_NAME, POLICY_TYPE, REGION,
                       PERIOD_START, PERIOD_END, METRIC_VALUE, PREVIOUS_VALUE,
                       YOY_CHANGE_PCT, TREND_DIRECTION, INDUSTRY_BENCHMARK,
                       OUR_PERFORMANCE, VARIANCE_TO_MARKET, CONFIDENCE_LEVEL
                FROM MARKET_TRENDS
-               WHERE METRIC_NAME = '${metricName}'
-               ${policyType ? "AND POLICY_TYPE = '" + policyType + "'" : ""}
-               ORDER BY PERIOD_END DESC`;
-  var stmt = snowflake.createStatement({sqlText: query});
+               WHERE METRIC_NAME = ?`;
+  if (policyType) {
+    query += ` AND POLICY_TYPE = ?`;
+    binds.push(policyType);
+  }
+  query += ` ORDER BY PERIOD_END DESC`;
+  var stmt = snowflake.createStatement({sqlText: query, binds: binds});
   var result = stmt.execute();
 
   var trends = [];

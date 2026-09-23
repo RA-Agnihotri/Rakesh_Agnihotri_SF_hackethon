@@ -48,9 +48,11 @@ CREATE EXTERNAL MCP SERVER IF NOT EXISTS ATLASSIAN_MCP_SERVER
 GRANT USAGE ON EXTERNAL MCP SERVER ATLASSIAN_MCP_SERVER TO ROLE ACCOUNTADMIN;
 GRANT USAGE ON INTEGRATION JIRA_MCP_API_INTEGRATION TO ROLE ACCOUNTADMIN;
 
--- Optionally grant to broader roles for multi-user access
-GRANT USAGE ON EXTERNAL MCP SERVER ATLASSIAN_MCP_SERVER TO ROLE PUBLIC;
-GRANT USAGE ON INTEGRATION JIRA_MCP_API_INTEGRATION TO ROLE PUBLIC;
+-- Scoped grants via database roles (configured in 19_extended_rbac.sql)
+-- INSURANCE_ADMIN_ROLE and INSURANCE_EXEC_ROLE get MCP access there.
+-- NEVER grant MCP server or API integration to PUBLIC — it exposes
+-- write access to external systems (Jira ticket creation/modification)
+-- to every user in the account.
 
 -- ############################################################################
 -- Step 4: Verification

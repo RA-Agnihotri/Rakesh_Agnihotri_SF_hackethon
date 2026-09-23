@@ -100,13 +100,33 @@ GRANT USAGE ON DATABASE INSURANCE_AI_HUB TO DATABASE ROLE INSURANCE_AI_HUB.INSUR
 
 
 -- ############################################################################
--- SECTION 7: GRANT DATABASE ROLES TO ACCOUNT ROLES (Customize per environment)
+-- SECTION 7: SERVICE ROLE GRANTS
+-- The INSURANCE_SERVICE_ROLE (account role, created in 00_setup.sql) needs
+-- the ADMIN database role so agents/tasks can read all schemas.
 -- ############################################################################
 
--- Example: Grant admin role to SYSADMIN (uncomment and adjust for your environment)
--- GRANT DATABASE ROLE INSURANCE_AI_HUB.INSURANCE_ADMIN_ROLE TO ROLE SYSADMIN;
+GRANT DATABASE ROLE INSURANCE_AI_HUB.INSURANCE_ADMIN_ROLE TO ROLE INSURANCE_SERVICE_ROLE;
+
+-- Service role also needs INSERT on audit log for agent observability
+GRANT INSERT ON TABLE INSURANCE_AI_HUB.ANALYTICS.AGENT_AUDIT_LOG TO DATABASE ROLE INSURANCE_AI_HUB.INSURANCE_ADMIN_ROLE;
+
+
+-- ############################################################################
+-- SECTION 8: GRANT DATABASE ROLES TO ACCOUNT ROLES
+-- Uncomment and adjust for your environment. Without these grants,
+-- the database roles exist but no user can activate them.
+-- ############################################################################
+
+-- Admin database role -> deploy role (for DDL) and SYSADMIN
+GRANT DATABASE ROLE INSURANCE_AI_HUB.INSURANCE_ADMIN_ROLE TO ROLE INSURANCE_DEPLOY_ROLE;
+GRANT DATABASE ROLE INSURANCE_AI_HUB.INSURANCE_ADMIN_ROLE TO ROLE SYSADMIN;
+
+-- Map remaining database roles to your account roles:
 -- GRANT DATABASE ROLE INSURANCE_AI_HUB.INSURANCE_ANALYST_ROLE TO ROLE <YOUR_ANALYST_ROLE>;
 -- GRANT DATABASE ROLE INSURANCE_AI_HUB.INSURANCE_EXEC_ROLE TO ROLE <YOUR_EXEC_ROLE>;
+-- GRANT DATABASE ROLE INSURANCE_AI_HUB.INSURANCE_UW_ROLE TO ROLE <YOUR_UW_ROLE>;
+-- GRANT DATABASE ROLE INSURANCE_AI_HUB.INSURANCE_CLAIMS_ROLE TO ROLE <YOUR_CLAIMS_ROLE>;
+-- GRANT DATABASE ROLE INSURANCE_AI_HUB.INSURANCE_DATA_STEWARD_ROLE TO ROLE <YOUR_STEWARD_ROLE>;
 
 -- ============================================================================
 -- END OF 08_rbac.sql
