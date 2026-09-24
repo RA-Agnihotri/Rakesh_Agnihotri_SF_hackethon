@@ -1,8 +1,239 @@
-# Semantic View: Competitive Intelligence
-# Tables: COMPETITOR_PRICING, PRODUCT_CATALOG, PRICING_SCENARIOS, POLICIES
-# VQRs: 4
-
 name: SV_COMPETITIVE_INTEL
 description: >
   Competitive intelligence model for insurance pricing analysis. Covers product
   catalog, competitor pricing benchmarks, and pricing optimization scenarios.
+  Enables comparison of our premiums against competitors, market share analysis,
+  and revenue impact projections for pricing strategy changes.
+tables:
+  - name: COMPETITOR_PRICING
+    base_table:
+      database: INSURANCE_AI_HUB
+      schema: ANALYTICS
+      table: COMPETITOR_PRICING
+    primary_key:
+      columns:
+        - BENCHMARK_ID
+    dimensions:
+      - name: BENCHMARK_ID
+        expr: BENCHMARK_ID
+        data_type: VARCHAR(20)
+      - name: COMPETITOR_NAME
+        expr: COMPETITOR_NAME
+        data_type: VARCHAR(100)
+      - name: POLICY_TYPE
+        expr: POLICY_TYPE
+        data_type: VARCHAR(20)
+      - name: PLAN_TIER
+        expr: PLAN_TIER
+        data_type: VARCHAR(20)
+      - name: REGION
+        expr: REGION
+        data_type: VARCHAR(50)
+      - name: DATA_SOURCE
+        expr: DATA_SOURCE
+        data_type: VARCHAR(100)
+      - name: SNAPSHOT_DATE
+        expr: SNAPSHOT_DATE
+        data_type: DATE
+    facts:
+      - name: AVG_PREMIUM
+        expr: AVG_PREMIUM
+        data_type: NUMBER(12,2)
+      - name: MIN_PREMIUM
+        expr: MIN_PREMIUM
+        data_type: NUMBER(12,2)
+      - name: MAX_PREMIUM
+        expr: MAX_PREMIUM
+        data_type: NUMBER(12,2)
+      - name: AVG_COVERAGE
+        expr: AVG_COVERAGE
+        data_type: NUMBER(14,2)
+      - name: AVG_DEDUCTIBLE
+        expr: AVG_DEDUCTIBLE
+        data_type: NUMBER(10,2)
+      - name: MARKET_SHARE_PCT
+        expr: MARKET_SHARE_PCT
+        data_type: FLOAT
+      - name: CUSTOMER_RATING
+        expr: CUSTOMER_RATING
+        data_type: FLOAT
+  - name: PRODUCT_CATALOG
+    base_table:
+      database: INSURANCE_AI_HUB
+      schema: ANALYTICS
+      table: PRODUCT_CATALOG
+    primary_key:
+      columns:
+        - PRODUCT_ID
+    dimensions:
+      - name: PRODUCT_ID
+        expr: PRODUCT_ID
+        data_type: VARCHAR(20)
+      - name: PRODUCT_NAME
+        expr: PRODUCT_NAME
+        data_type: VARCHAR(100)
+      - name: POLICY_TYPE
+        expr: POLICY_TYPE
+        data_type: VARCHAR(20)
+      - name: PLAN_TIER
+        expr: PLAN_TIER
+        data_type: VARCHAR(20)
+      - name: TARGET_SEGMENT
+        expr: TARGET_SEGMENT
+        data_type: VARCHAR(30)
+      - name: TARGET_RISK_TIER
+        expr: TARGET_RISK_TIER
+        data_type: VARCHAR(20)
+      - name: ACTIVE_FLAG
+        expr: ACTIVE_FLAG
+        data_type: BOOLEAN
+      - name: EFFECTIVE_DATE
+        expr: EFFECTIVE_DATE
+        data_type: DATE
+      - name: EXPIRY_DATE
+        expr: EXPIRY_DATE
+        data_type: DATE
+    facts:
+      - name: BASE_PREMIUM
+        expr: BASE_PREMIUM
+        data_type: NUMBER(12,2)
+      - name: MIN_COVERAGE
+        expr: MIN_COVERAGE
+        data_type: NUMBER(14,2)
+      - name: MAX_COVERAGE
+        expr: MAX_COVERAGE
+        data_type: NUMBER(14,2)
+      - name: DEFAULT_DEDUCTIBLE
+        expr: DEFAULT_DEDUCTIBLE
+        data_type: NUMBER(10,2)
+      - name: COMMISSION_PCT
+        expr: COMMISSION_PCT
+        data_type: FLOAT
+  - name: PRICING_SCENARIOS
+    base_table:
+      database: INSURANCE_AI_HUB
+      schema: ANALYTICS
+      table: PRICING_SCENARIOS
+    primary_key:
+      columns:
+        - SCENARIO_ID
+    dimensions:
+      - name: SCENARIO_ID
+        expr: SCENARIO_ID
+        data_type: VARCHAR(20)
+      - name: POLICY_TYPE
+        expr: POLICY_TYPE
+        data_type: VARCHAR(20)
+      - name: PLAN_TIER
+        expr: PLAN_TIER
+        data_type: VARCHAR(20)
+      - name: REGION
+        expr: REGION
+        data_type: VARCHAR(50)
+      - name: PRICE_POSITION
+        expr: PRICE_POSITION
+        data_type: VARCHAR(20)
+      - name: PROJECTED_NEW_BUSINESS
+        expr: PROJECTED_NEW_BUSINESS
+        data_type: NUMBER(38,0)
+      - name: RECOMMENDATION
+        expr: RECOMMENDATION
+        data_type: VARCHAR(200)
+      - name: SCENARIO_DATE
+        expr: SCENARIO_DATE
+        data_type: DATE
+    facts:
+      - name: CURRENT_PREMIUM
+        expr: CURRENT_PREMIUM
+        data_type: NUMBER(12,2)
+      - name: PROPOSED_PREMIUM
+        expr: PROPOSED_PREMIUM
+        data_type: NUMBER(12,2)
+      - name: MARKET_AVG_PREMIUM
+        expr: MARKET_AVG_PREMIUM
+        data_type: NUMBER(12,2)
+      - name: PROJECTED_RETENTION_PCT
+        expr: PROJECTED_RETENTION_PCT
+        data_type: FLOAT
+      - name: REVENUE_IMPACT
+        expr: REVENUE_IMPACT
+        data_type: NUMBER(14,2)
+      - name: LOSS_RATIO_IMPACT
+        expr: LOSS_RATIO_IMPACT
+        data_type: FLOAT
+  - name: POLICIES
+    base_table:
+      database: INSURANCE_AI_HUB
+      schema: ANALYTICS
+      table: POLICIES
+    primary_key:
+      columns:
+        - POLICY_ID
+    dimensions:
+      - name: POLICY_ID
+        expr: POLICY_ID
+        data_type: VARCHAR(20)
+      - name: CUSTOMER_ID
+        expr: CUSTOMER_ID
+        data_type: VARCHAR(20)
+      - name: AGENT_ID
+        expr: AGENT_ID
+        data_type: VARCHAR(20)
+      - name: POLICY_TYPE
+        expr: POLICY_TYPE
+        data_type: VARCHAR(20)
+      - name: POLICY_STATUS
+        expr: POLICY_STATUS
+        data_type: VARCHAR(20)
+      - name: PLAN_TIER
+        expr: PLAN_TIER
+        data_type: VARCHAR(20)
+      - name: PAYMENT_FREQUENCY
+        expr: PAYMENT_FREQUENCY
+        data_type: VARCHAR(20)
+      - name: START_DATE
+        expr: START_DATE
+        data_type: DATE
+      - name: END_DATE
+        expr: END_DATE
+        data_type: DATE
+    facts:
+      - name: PREMIUM_AMOUNT
+        expr: PREMIUM_AMOUNT
+        data_type: NUMBER(12,2)
+      - name: COVERAGE_AMOUNT
+        expr: COVERAGE_AMOUNT
+        data_type: NUMBER(14,2)
+      - name: DEDUCTIBLE
+        expr: DEDUCTIBLE
+        data_type: NUMBER(10,2)
+      - name: LOSS_RATIO
+        expr: LOSS_RATIO
+        data_type: FLOAT
+relationships: []
+verified_queries:
+  - name: "0;1"
+    question: Which competitors have the highest market share across all regions and policy types?
+    sql: >
+      SELECT cp.REGION, cp.POLICY_TYPE, cp.COMPETITOR_NAME, cp.MARKET_SHARE_PCT,
+      cp.CUSTOMER_RATING FROM competitor_pricing AS cp ORDER BY cp.MARKET_SHARE_PCT DESC
+    verified_at: 1789047606
+    verified_by: Semantic Model Generator
+  - name: "1;1"
+    question: What are the pricing optimization scenarios for Health insurance?
+    sql: >
+      SELECT ps.POLICY_TYPE, ps.PLAN_TIER, ps.REGION, ps.CURRENT_PREMIUM,
+      ps.PROPOSED_PREMIUM, ps.MARKET_AVG_PREMIUM, ps.PRICE_POSITION,
+      ps.REVENUE_IMPACT, ps.RECOMMENDATION FROM pricing_scenarios AS ps
+      WHERE ps.POLICY_TYPE = 'Health'
+    verified_at: 1789047606
+    verified_by: Semantic Model Generator
+  - name: "2;1"
+    question: What is the revenue impact of matching market pricing by policy type and region?
+    sql: >
+      SELECT ps.POLICY_TYPE, ps.REGION, ps.PRICE_POSITION,
+      SUM(ps.REVENUE_IMPACT) AS total_revenue_impact FROM pricing_scenarios AS ps
+      WHERE ps.PRICE_POSITION = 'at_market'
+      GROUP BY ps.POLICY_TYPE, ps.REGION, ps.PRICE_POSITION
+    verified_at: 1789047606
+    verified_by: Semantic Model Generator
