@@ -1,8 +1,278 @@
 # Semantic View: Market Intelligence
-# Tables: MARKET_TRENDS, COMPETITOR_PRICING
-# VQRs: 3
+# Tables: MARKET_TRENDS, COMPETITOR_PRICING, POLICIES, CLAIMS
+# VQRs: 5
 
 name: SV_MARKET_INTELLIGENCE
 description: >
   Market intelligence model for insurance industry analysis. Covers market trends,
-  industry benchmarks, year-over-year changes, and regional conditions.
+  industry benchmarks, year-over-year changes, claim frequency, premium growth,
+  loss ratio benchmarks, and regulatory changes across regions and policy types.
+  Enables comparison of internal performance against market conditions.
+
+tables:
+
+  # ── MARKET_TRENDS ──────────────────────────────────────────────
+  - name: MARKET_TRENDS
+    base_table:
+      database: INSURANCE_AI_HUB
+      schema: ANALYTICS
+      table: MARKET_TRENDS
+    primary_key:
+      - TREND_ID
+    dimensions:
+      - name: TREND_ID
+        expr: TREND_ID
+        data_type: VARCHAR(20)
+      - name: REGION
+        expr: REGION
+        data_type: VARCHAR(50)
+      - name: POLICY_TYPE
+        expr: POLICY_TYPE
+        data_type: VARCHAR(20)
+      - name: METRIC_NAME
+        expr: METRIC_NAME
+        data_type: VARCHAR(50)
+      - name: METRIC_UNIT
+        expr: METRIC_UNIT
+        data_type: VARCHAR(20)
+      - name: TREND_DIRECTION
+        expr: TREND_DIRECTION
+        data_type: VARCHAR(10)
+      - name: SOURCE
+        expr: SOURCE
+        data_type: VARCHAR(100)
+      - name: NOTES
+        expr: NOTES
+        data_type: VARCHAR(16777216)
+    facts:
+      - name: METRIC_VALUE
+        expr: METRIC_VALUE
+        data_type: FLOAT
+      - name: YOY_CHANGE_PCT
+        expr: YOY_CHANGE_PCT
+        data_type: FLOAT
+    time_dimensions:
+      - name: TREND_DATE
+        expr: TREND_DATE
+        data_type: DATE
+
+  # ── COMPETITOR_PRICING ─────────────────────────────────────────
+  - name: COMPETITOR_PRICING
+    base_table:
+      database: INSURANCE_AI_HUB
+      schema: ANALYTICS
+      table: COMPETITOR_PRICING
+    primary_key:
+      - BENCHMARK_ID
+    dimensions:
+      - name: BENCHMARK_ID
+        expr: BENCHMARK_ID
+        data_type: VARCHAR(20)
+      - name: COMPETITOR_NAME
+        expr: COMPETITOR_NAME
+        data_type: VARCHAR(100)
+      - name: POLICY_TYPE
+        expr: POLICY_TYPE
+        data_type: VARCHAR(20)
+      - name: PLAN_TIER
+        expr: PLAN_TIER
+        data_type: VARCHAR(20)
+      - name: REGION
+        expr: REGION
+        data_type: VARCHAR(50)
+    facts:
+      - name: AVG_PREMIUM
+        expr: AVG_PREMIUM
+        data_type: NUMBER(12,2)
+      - name: MIN_PREMIUM
+        expr: MIN_PREMIUM
+        data_type: NUMBER(12,2)
+      - name: MAX_PREMIUM
+        expr: MAX_PREMIUM
+        data_type: NUMBER(12,2)
+      - name: AVG_COVERAGE
+        expr: AVG_COVERAGE
+        data_type: NUMBER(14,2)
+      - name: AVG_DEDUCTIBLE
+        expr: AVG_DEDUCTIBLE
+        data_type: NUMBER(10,2)
+      - name: MARKET_SHARE_PCT
+        expr: MARKET_SHARE_PCT
+        data_type: FLOAT
+      - name: CUSTOMER_RATING
+        expr: CUSTOMER_RATING
+        data_type: FLOAT
+    time_dimensions:
+      - name: SNAPSHOT_DATE
+        expr: SNAPSHOT_DATE
+        data_type: DATE
+
+  # ── POLICIES ───────────────────────────────────────────────────
+  - name: POLICIES
+    base_table:
+      database: INSURANCE_AI_HUB
+      schema: ANALYTICS
+      table: POLICIES
+    primary_key:
+      - POLICY_ID
+    dimensions:
+      - name: POLICY_ID
+        expr: POLICY_ID
+        data_type: VARCHAR(20)
+      - name: CUSTOMER_ID
+        expr: CUSTOMER_ID
+        data_type: VARCHAR(20)
+      - name: AGENT_ID
+        expr: AGENT_ID
+        data_type: VARCHAR(20)
+      - name: POLICY_TYPE
+        expr: POLICY_TYPE
+        data_type: VARCHAR(20)
+      - name: POLICY_STATUS
+        expr: POLICY_STATUS
+        data_type: VARCHAR(20)
+      - name: PLAN_TIER
+        expr: PLAN_TIER
+        data_type: VARCHAR(20)
+      - name: PAYMENT_FREQUENCY
+        expr: PAYMENT_FREQUENCY
+        data_type: VARCHAR(20)
+    facts:
+      - name: PREMIUM_AMOUNT
+        expr: PREMIUM_AMOUNT
+        data_type: NUMBER(12,2)
+      - name: COVERAGE_AMOUNT
+        expr: COVERAGE_AMOUNT
+        data_type: NUMBER(14,2)
+      - name: DEDUCTIBLE
+        expr: DEDUCTIBLE
+        data_type: NUMBER(10,2)
+      - name: LOSS_RATIO
+        expr: LOSS_RATIO
+        data_type: FLOAT
+    time_dimensions:
+      - name: START_DATE
+        expr: START_DATE
+        data_type: DATE
+      - name: END_DATE
+        expr: END_DATE
+        data_type: DATE
+
+  # ── CLAIMS ─────────────────────────────────────────────────────
+  - name: CLAIMS
+    base_table:
+      database: INSURANCE_AI_HUB
+      schema: ANALYTICS
+      table: CLAIMS
+    primary_key:
+      - CLAIM_ID
+    dimensions:
+      - name: CLAIM_ID
+        expr: CLAIM_ID
+        data_type: VARCHAR(20)
+      - name: POLICY_ID
+        expr: POLICY_ID
+        data_type: VARCHAR(20)
+      - name: CUSTOMER_ID
+        expr: CUSTOMER_ID
+        data_type: VARCHAR(20)
+      - name: CLAIM_TYPE
+        expr: CLAIM_TYPE
+        data_type: VARCHAR(30)
+      - name: CLAIM_STATUS
+        expr: CLAIM_STATUS
+        data_type: VARCHAR(30)
+      - name: FRAUD_FLAG
+        expr: FRAUD_FLAG
+        data_type: BOOLEAN
+      - name: ASSIGNED_ADJUSTER
+        expr: ASSIGNED_ADJUSTER
+        data_type: VARCHAR(50)
+      - name: DAYS_TO_RESOLVE
+        expr: DAYS_TO_RESOLVE
+        data_type: NUMBER(38,0)
+      - name: FRICTION_POINT
+        expr: FRICTION_POINT
+        data_type: VARCHAR(100)
+      - name: PRIORITY
+        expr: PRIORITY
+        data_type: VARCHAR(10)
+    facts:
+      - name: CLAIM_AMOUNT
+        expr: CLAIM_AMOUNT
+        data_type: NUMBER(12,2)
+      - name: APPROVED_AMOUNT
+        expr: APPROVED_AMOUNT
+        data_type: NUMBER(12,2)
+      - name: FRAUD_SCORE
+        expr: FRAUD_SCORE
+        data_type: FLOAT
+    time_dimensions:
+      - name: CLAIM_DATE
+        expr: CLAIM_DATE
+        data_type: DATE
+      - name: RESOLUTION_DATE
+        expr: RESOLUTION_DATE
+        data_type: DATE
+
+# ── Verified Queries ───────────────────────────────────────────
+verified_queries:
+  - name: market_trends_by_policy_type
+    question: "What are the key market trends for Health insurance?"
+    sql: >
+      SELECT mt.POLICY_TYPE, mt.METRIC_NAME, mt.METRIC_VALUE,
+             mt.YOY_CHANGE_PCT, mt.TREND_DIRECTION, mt.REGION
+      FROM market_trends AS mt
+      WHERE mt.POLICY_TYPE = 'Health'
+      ORDER BY mt.TREND_DATE DESC
+    verified_at: 1789047580
+    verified_by: Semantic Model Generator
+
+  - name: claim_frequency_yoy
+    question: "How has claim frequency changed year-over-year by region and policy type?"
+    sql: >
+      SELECT mt.REGION, mt.POLICY_TYPE,
+             mt.METRIC_VALUE AS claim_frequency, mt.YOY_CHANGE_PCT
+      FROM market_trends AS mt
+      WHERE mt.METRIC_NAME = 'claim_frequency'
+      ORDER BY mt.YOY_CHANGE_PCT DESC
+    verified_at: 1789047580
+    verified_by: Semantic Model Generator
+
+  - name: fastest_premium_growth
+    question: "Which policy types are experiencing the fastest premium growth in the market?"
+    sql: >
+      SELECT mt.POLICY_TYPE,
+             AVG(mt.YOY_CHANGE_PCT) AS avg_yoy_growth
+      FROM market_trends AS mt
+      WHERE mt.METRIC_NAME = 'avg_industry_premium'
+      GROUP BY mt.POLICY_TYPE
+      ORDER BY avg_yoy_growth DESC
+    verified_at: 1789047580
+    verified_by: Semantic Model Generator
+
+  - name: loss_ratio_vs_benchmark
+    question: "How do our loss ratios compare to industry benchmarks for each policy type?"
+    sql: >
+      SELECT p.POLICY_TYPE,
+             AVG(p.LOSS_RATIO) AS our_avg_loss_ratio,
+             AVG(mt.METRIC_VALUE) AS industry_benchmark
+      FROM policies AS p
+      JOIN market_trends AS mt
+        ON p.POLICY_TYPE = mt.POLICY_TYPE
+       AND mt.METRIC_NAME = 'loss_ratio_benchmark'
+      WHERE p.POLICY_STATUS = 'Active'
+      GROUP BY p.POLICY_TYPE
+    verified_at: 1789047580
+    verified_by: Semantic Model Generator
+
+  - name: regulatory_changes
+    question: "What regulatory changes are affecting the insurance market?"
+    sql: >
+      SELECT mt.REGION, mt.POLICY_TYPE, mt.NOTES, mt.TREND_DATE
+      FROM market_trends AS mt
+      WHERE mt.METRIC_NAME = 'regulatory_change'
+        AND NOT mt.NOTES IS NULL
+      ORDER BY mt.TREND_DATE DESC
+    verified_at: 1789047580
+    verified_by: Semantic Model Generator

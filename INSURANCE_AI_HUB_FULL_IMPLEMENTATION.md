@@ -1,44 +1,30 @@
 # Insurance AI Hub — Complete Implementation Guide (Full Code)
 
-> **11,176 lines of source code | 60+ files | 22 Snowflake features**
+> **60+ files | 22 Snowflake features**
 >
-> This document contains EVERY line of code needed to recreate the Insurance AI Hub from scratch.
-> Share this with anyone who has CoCo + Snowflake access and they can deploy the entire solution.
+> Every line of code to recreate the Insurance AI Hub from scratch.
 
 ---
 
 ## Execution Order
 
 ```
-PHASE 1: Snowflake SQL (run in Snowsight or via SnowSQL)
-  sql/00_setup.sql              → Infrastructure
-  sql/01_governance.sql         → Tags & masking
-  sql/02_tables.sql             → 13 tables
-  sql/03_views.sql              → 4 views
-  sql/04_semantic_views.sql     → 2 semantic views (15 VQRs)
-  sql/05_procedures.sql         → 3 procedures
-  sql/08_rbac.sql               → 6 database roles
-  sql/09_seed_data.sql          → Seed data (~1,670 rows)
-  sql/06_cortex_search.sql      → Cortex Search (RAG)
-  sql/10_extended_tables.sql    → 5 new tables
-  sql/11_extended_views.sql     → 3 new views
-  sql/12_extended_semantic_views.sql → 3 semantic views (10 VQRs)
-  sql/13_extended_procedures.sql → 3 new procedures
-  sql/14_extended_seed_data.sql  → Extended seed data (~400 rows)
-  sql/18_mcp_connectors.sql     → Atlassian MCP
-  sql/15_specialized_agents.sql  → 3 domain agents
-  sql/16_unified_agent.sql       → Unified enterprise agent
-  sql/17_cowork_setup.sql        → CoWork
-  sql/19_extended_rbac.sql       → Extended grants
-  sql/21_tasks_and_streams.sql   → Automation
-
-PHASE 2: Cortex Project — snow cortex deploy --project-dir cortex_project/
-PHASE 3: Dashboard — cd dashboard && npm install && npm run dev
+sql/00_setup.sql → sql/01_governance.sql → sql/02_tables.sql → sql/03_views.sql
+→ sql/04_semantic_views.sql → sql/05_procedures.sql → sql/08_rbac.sql
+→ sql/09_seed_data.sql → sql/06_cortex_search.sql → sql/10_extended_tables.sql
+→ sql/11_extended_views.sql → sql/12_extended_semantic_views.sql
+→ sql/13_extended_procedures.sql → sql/14_extended_seed_data.sql
+→ sql/18_mcp_connectors.sql → sql/15_specialized_agents.sql
+→ sql/16_unified_agent.sql → sql/17_cowork_setup.sql → sql/19_extended_rbac.sql
+→ sql/21_tasks_and_streams.sql
+Then: snow cortex deploy --project-dir cortex_project/
+Then: cd dashboard && npm install && npm run dev
 ```
 
 ---
 
-## PART 1: SQL Scripts\n
+
+## PART 1: SQL Scripts
 
 ### File: `sql/00_setup.sql`
 
@@ -135,11 +121,21 @@ ALTER WAREHOUSE COMPUTE_WH SET RESOURCE_MONITOR = INSURANCE_AI_HUB_MONITOR;
 -- Adjust spending_limit to your monthly AI budget.
 -- ############################################################################
 
+-- Budget requires a database+schema context for the instance object.
+-- We use INSURANCE_AI_HUB.ANALYTICS as the home schema.
+USE DATABASE INSURANCE_AI_HUB;
+USE SCHEMA ANALYTICS;
+
 CREATE SNOWFLAKE.CORE.BUDGET IF NOT EXISTS INSURANCE_AI_HUB_BUDGET();
-CALL INSURANCE_AI_HUB_BUDGET!SET_SPENDING_LIMIT(1000);
--- Adds the warehouse to the budget so BOTH warehouse + serverless are tracked
-CALL INSURANCE_AI_HUB_BUDGET!ADD_RESOURCE(
-  SYSTEM$REFERENCE('WAREHOUSE', 'COMPUTE_WH')
+CALL INSURANCE_AI_HUB.ANALYTICS.INSURANCE_AI_HUB_BUDGET!SET_SPENDING_LIMIT(1000);
+
+-- ADD_RESOURCE requires APPLYBUDGET privilege on the warehouse.
+GRANT APPLYBUDGET ON WAREHOUSE COMPUTE_WH TO ROLE ACCOUNTADMIN;
+
+-- Adds the warehouse to the budget so BOTH warehouse + serverless are tracked.
+-- SYSTEM$REFERENCE needs the APPLYBUDGET privilege qualifier to resolve.
+CALL INSURANCE_AI_HUB.ANALYTICS.INSURANCE_AI_HUB_BUDGET!ADD_RESOURCE(
+  SYSTEM$REFERENCE('WAREHOUSE', 'COMPUTE_WH', 'SESSION', 'APPLYBUDGET')
 );
 
 -- ############################################################################
@@ -3620,7 +3616,15 @@ DROP DATABASE ROLE IF EXISTS INSURANCE_AI_HUB.INSURANCE_DATA_STEWARD_ROLE;
 
 
 -- ############################################################################
--- SECTION 11: Drop Database (cascades all tables, schemas)
+-- SECTION 11: Drop Budget (must be done before dropping database)
+-- The budget is a SNOWFLAKE.CORE.BUDGET instance inside INSURANCE_AI_HUB.ANALYTICS.
+-- ############################################################################
+
+DROP SNOWFLAKE.CORE.BUDGET IF EXISTS INSURANCE_AI_HUB.ANALYTICS.INSURANCE_AI_HUB_BUDGET;
+
+
+-- ############################################################################
+-- SECTION 12: Drop Database (cascades all tables, schemas)
 -- This is the nuclear option. Comment out if you want to keep the database
 -- and only drop individual objects above.
 -- ############################################################################
@@ -3629,7 +3633,7 @@ DROP DATABASE ROLE IF EXISTS INSURANCE_AI_HUB.INSURANCE_DATA_STEWARD_ROLE;
 
 
 -- ############################################################################
--- SECTION 12: Drop Account-level objects
+-- SECTION 13: Drop Account-level objects
 -- Only run these if fully removing the solution from the account.
 -- ############################################################################
 
@@ -5020,14 +5024,245 @@ verified_queries:
 ### File: `cortex_project/SV_COMPETITIVE_INTEL.sv.yaml`
 
 ```yaml
-# Semantic View: Competitive Intelligence
-# Tables: COMPETITOR_PRICING, PRODUCT_CATALOG, PRICING_SCENARIOS, POLICIES
-# VQRs: 4
-
 name: SV_COMPETITIVE_INTEL
 description: >
   Competitive intelligence model for insurance pricing analysis. Covers product
   catalog, competitor pricing benchmarks, and pricing optimization scenarios.
+  Enables comparison of our premiums against competitors, market share analysis,
+  and revenue impact projections for pricing strategy changes.
+tables:
+  - name: COMPETITOR_PRICING
+    base_table:
+      database: INSURANCE_AI_HUB
+      schema: ANALYTICS
+      table: COMPETITOR_PRICING
+    primary_key:
+      columns:
+        - BENCHMARK_ID
+    dimensions:
+      - name: BENCHMARK_ID
+        expr: BENCHMARK_ID
+        data_type: VARCHAR(20)
+      - name: COMPETITOR_NAME
+        expr: COMPETITOR_NAME
+        data_type: VARCHAR(100)
+      - name: POLICY_TYPE
+        expr: POLICY_TYPE
+        data_type: VARCHAR(20)
+      - name: PLAN_TIER
+        expr: PLAN_TIER
+        data_type: VARCHAR(20)
+      - name: REGION
+        expr: REGION
+        data_type: VARCHAR(50)
+      - name: DATA_SOURCE
+        expr: DATA_SOURCE
+        data_type: VARCHAR(100)
+      - name: SNAPSHOT_DATE
+        expr: SNAPSHOT_DATE
+        data_type: DATE
+    facts:
+      - name: AVG_PREMIUM
+        expr: AVG_PREMIUM
+        data_type: NUMBER(12,2)
+      - name: MIN_PREMIUM
+        expr: MIN_PREMIUM
+        data_type: NUMBER(12,2)
+      - name: MAX_PREMIUM
+        expr: MAX_PREMIUM
+        data_type: NUMBER(12,2)
+      - name: AVG_COVERAGE
+        expr: AVG_COVERAGE
+        data_type: NUMBER(14,2)
+      - name: AVG_DEDUCTIBLE
+        expr: AVG_DEDUCTIBLE
+        data_type: NUMBER(10,2)
+      - name: MARKET_SHARE_PCT
+        expr: MARKET_SHARE_PCT
+        data_type: FLOAT
+      - name: CUSTOMER_RATING
+        expr: CUSTOMER_RATING
+        data_type: FLOAT
+  - name: PRODUCT_CATALOG
+    base_table:
+      database: INSURANCE_AI_HUB
+      schema: ANALYTICS
+      table: PRODUCT_CATALOG
+    primary_key:
+      columns:
+        - PRODUCT_ID
+    dimensions:
+      - name: PRODUCT_ID
+        expr: PRODUCT_ID
+        data_type: VARCHAR(20)
+      - name: PRODUCT_NAME
+        expr: PRODUCT_NAME
+        data_type: VARCHAR(100)
+      - name: POLICY_TYPE
+        expr: POLICY_TYPE
+        data_type: VARCHAR(20)
+      - name: PLAN_TIER
+        expr: PLAN_TIER
+        data_type: VARCHAR(20)
+      - name: TARGET_SEGMENT
+        expr: TARGET_SEGMENT
+        data_type: VARCHAR(30)
+      - name: TARGET_RISK_TIER
+        expr: TARGET_RISK_TIER
+        data_type: VARCHAR(20)
+      - name: ACTIVE_FLAG
+        expr: ACTIVE_FLAG
+        data_type: BOOLEAN
+      - name: EFFECTIVE_DATE
+        expr: EFFECTIVE_DATE
+        data_type: DATE
+      - name: EXPIRY_DATE
+        expr: EXPIRY_DATE
+        data_type: DATE
+    facts:
+      - name: BASE_PREMIUM
+        expr: BASE_PREMIUM
+        data_type: NUMBER(12,2)
+      - name: MIN_COVERAGE
+        expr: MIN_COVERAGE
+        data_type: NUMBER(14,2)
+      - name: MAX_COVERAGE
+        expr: MAX_COVERAGE
+        data_type: NUMBER(14,2)
+      - name: DEFAULT_DEDUCTIBLE
+        expr: DEFAULT_DEDUCTIBLE
+        data_type: NUMBER(10,2)
+      - name: COMMISSION_PCT
+        expr: COMMISSION_PCT
+        data_type: FLOAT
+  - name: PRICING_SCENARIOS
+    base_table:
+      database: INSURANCE_AI_HUB
+      schema: ANALYTICS
+      table: PRICING_SCENARIOS
+    primary_key:
+      columns:
+        - SCENARIO_ID
+    dimensions:
+      - name: SCENARIO_ID
+        expr: SCENARIO_ID
+        data_type: VARCHAR(20)
+      - name: POLICY_TYPE
+        expr: POLICY_TYPE
+        data_type: VARCHAR(20)
+      - name: PLAN_TIER
+        expr: PLAN_TIER
+        data_type: VARCHAR(20)
+      - name: REGION
+        expr: REGION
+        data_type: VARCHAR(50)
+      - name: PRICE_POSITION
+        expr: PRICE_POSITION
+        data_type: VARCHAR(20)
+      - name: PROJECTED_NEW_BUSINESS
+        expr: PROJECTED_NEW_BUSINESS
+        data_type: NUMBER(38,0)
+      - name: RECOMMENDATION
+        expr: RECOMMENDATION
+        data_type: VARCHAR(200)
+      - name: SCENARIO_DATE
+        expr: SCENARIO_DATE
+        data_type: DATE
+    facts:
+      - name: CURRENT_PREMIUM
+        expr: CURRENT_PREMIUM
+        data_type: NUMBER(12,2)
+      - name: PROPOSED_PREMIUM
+        expr: PROPOSED_PREMIUM
+        data_type: NUMBER(12,2)
+      - name: MARKET_AVG_PREMIUM
+        expr: MARKET_AVG_PREMIUM
+        data_type: NUMBER(12,2)
+      - name: PROJECTED_RETENTION_PCT
+        expr: PROJECTED_RETENTION_PCT
+        data_type: FLOAT
+      - name: REVENUE_IMPACT
+        expr: REVENUE_IMPACT
+        data_type: NUMBER(14,2)
+      - name: LOSS_RATIO_IMPACT
+        expr: LOSS_RATIO_IMPACT
+        data_type: FLOAT
+  - name: POLICIES
+    base_table:
+      database: INSURANCE_AI_HUB
+      schema: ANALYTICS
+      table: POLICIES
+    primary_key:
+      columns:
+        - POLICY_ID
+    dimensions:
+      - name: POLICY_ID
+        expr: POLICY_ID
+        data_type: VARCHAR(20)
+      - name: CUSTOMER_ID
+        expr: CUSTOMER_ID
+        data_type: VARCHAR(20)
+      - name: AGENT_ID
+        expr: AGENT_ID
+        data_type: VARCHAR(20)
+      - name: POLICY_TYPE
+        expr: POLICY_TYPE
+        data_type: VARCHAR(20)
+      - name: POLICY_STATUS
+        expr: POLICY_STATUS
+        data_type: VARCHAR(20)
+      - name: PLAN_TIER
+        expr: PLAN_TIER
+        data_type: VARCHAR(20)
+      - name: PAYMENT_FREQUENCY
+        expr: PAYMENT_FREQUENCY
+        data_type: VARCHAR(20)
+      - name: START_DATE
+        expr: START_DATE
+        data_type: DATE
+      - name: END_DATE
+        expr: END_DATE
+        data_type: DATE
+    facts:
+      - name: PREMIUM_AMOUNT
+        expr: PREMIUM_AMOUNT
+        data_type: NUMBER(12,2)
+      - name: COVERAGE_AMOUNT
+        expr: COVERAGE_AMOUNT
+        data_type: NUMBER(14,2)
+      - name: DEDUCTIBLE
+        expr: DEDUCTIBLE
+        data_type: NUMBER(10,2)
+      - name: LOSS_RATIO
+        expr: LOSS_RATIO
+        data_type: FLOAT
+relationships: []
+verified_queries:
+  - name: "0;1"
+    question: Which competitors have the highest market share across all regions and policy types?
+    sql: >
+      SELECT cp.REGION, cp.POLICY_TYPE, cp.COMPETITOR_NAME, cp.MARKET_SHARE_PCT,
+      cp.CUSTOMER_RATING FROM competitor_pricing AS cp ORDER BY cp.MARKET_SHARE_PCT DESC
+    verified_at: 1789047606
+    verified_by: Semantic Model Generator
+  - name: "1;1"
+    question: What are the pricing optimization scenarios for Health insurance?
+    sql: >
+      SELECT ps.POLICY_TYPE, ps.PLAN_TIER, ps.REGION, ps.CURRENT_PREMIUM,
+      ps.PROPOSED_PREMIUM, ps.MARKET_AVG_PREMIUM, ps.PRICE_POSITION,
+      ps.REVENUE_IMPACT, ps.RECOMMENDATION FROM pricing_scenarios AS ps
+      WHERE ps.POLICY_TYPE = 'Health'
+    verified_at: 1789047606
+    verified_by: Semantic Model Generator
+  - name: "2;1"
+    question: What is the revenue impact of matching market pricing by policy type and region?
+    sql: >
+      SELECT ps.POLICY_TYPE, ps.REGION, ps.PRICE_POSITION,
+      SUM(ps.REVENUE_IMPACT) AS total_revenue_impact FROM pricing_scenarios AS ps
+      WHERE ps.PRICE_POSITION = 'at_market'
+      GROUP BY ps.POLICY_TYPE, ps.REGION, ps.PRICE_POSITION
+    verified_at: 1789047606
+    verified_by: Semantic Model Generator
 
 ```
 
@@ -9888,12 +10123,11 @@ SHOW DATABASE ROLES IN DATABASE INSURANCE_AI_HUB;
 SHOW STREAMS IN DATABASE INSURANCE_AI_HUB;
 SHOW TASKS IN DATABASE INSURANCE_AI_HUB;
 SHOW ALERTS IN DATABASE INSURANCE_AI_HUB;
-SHOW TAGS IN SCHEMA INSURANCE_AI_HUB.ANALYTICS;
-SHOW MASKING POLICIES IN SCHEMA INSURANCE_AI_HUB.ANALYTICS;
-SHOW EXTERNAL MCP SERVERS;
-SHOW AGENTS IN SNOWFLAKE INTELLIGENCE SNOWFLAKE_INTELLIGENCE_OBJECT_DEFAULT;
+SHOW RESOURCE MONITORS LIKE 'INSURANCE_AI_HUB_MONITOR';
+CALL INSURANCE_AI_HUB.ANALYTICS.INSURANCE_AI_HUB_BUDGET!GET_SPENDING_LIMIT();
+CALL INSURANCE_AI_HUB.ANALYTICS.INSURANCE_AI_HUB_BUDGET!GET_LINKED_RESOURCES();
 ```
 
 ---
 
-*Generated: 24 Sep 2026 | 60+ files | 11,176 lines*
+*Generated: 25 Sep 2026 | Updated with budget fix + SV_COMPETITIVE_INTEL sync*

@@ -90,11 +90,21 @@ ALTER WAREHOUSE COMPUTE_WH SET RESOURCE_MONITOR = INSURANCE_AI_HUB_MONITOR;
 -- Adjust spending_limit to your monthly AI budget.
 -- ############################################################################
 
+-- Budget requires a database+schema context for the instance object.
+-- We use INSURANCE_AI_HUB.ANALYTICS as the home schema.
+USE DATABASE INSURANCE_AI_HUB;
+USE SCHEMA ANALYTICS;
+
 CREATE SNOWFLAKE.CORE.BUDGET IF NOT EXISTS INSURANCE_AI_HUB_BUDGET();
-CALL INSURANCE_AI_HUB_BUDGET!SET_SPENDING_LIMIT(1000);
--- Adds the warehouse to the budget so BOTH warehouse + serverless are tracked
-CALL INSURANCE_AI_HUB_BUDGET!ADD_RESOURCE(
-  SYSTEM$REFERENCE('WAREHOUSE', 'COMPUTE_WH')
+CALL INSURANCE_AI_HUB.ANALYTICS.INSURANCE_AI_HUB_BUDGET!SET_SPENDING_LIMIT(1000);
+
+-- ADD_RESOURCE requires APPLYBUDGET privilege on the warehouse.
+GRANT APPLYBUDGET ON WAREHOUSE COMPUTE_WH TO ROLE ACCOUNTADMIN;
+
+-- Adds the warehouse to the budget so BOTH warehouse + serverless are tracked.
+-- SYSTEM$REFERENCE needs the APPLYBUDGET privilege qualifier to resolve.
+CALL INSURANCE_AI_HUB.ANALYTICS.INSURANCE_AI_HUB_BUDGET!ADD_RESOURCE(
+  SYSTEM$REFERENCE('WAREHOUSE', 'COMPUTE_WH', 'SESSION', 'APPLYBUDGET')
 );
 
 -- ############################################################################

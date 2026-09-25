@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Insurance AI Hub — Architecture &amp; Snowflake Integration</title>
+<style>
+  :root{--dk:#0f2027;--bl:#29B5E8;--gn:#2ECC71;--gy:#7F8C8D;--bg:#F4F6F9;--accent:#2563eb}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:#fff;color:#1e293b;line-height:1.7;font-size:14.5px}
+  .page{max-width:900px;margin:0 auto;padding:32px 40px}
+  
+  /* Cover */
+  .cover{background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);color:#fff;padding:60px 48px;text-align:center;margin:-32px -40px 40px;border-radius:0 0 20px 20px}
+  .cover h1{font-size:2rem;margin-bottom:6px;letter-spacing:-.5px}
+  .cover .sub{opacity:.85;font-size:1rem;margin-bottom:20px}
+  .cover .stats{display:flex;justify-content:center;gap:32px;flex-wrap:wrap;margin-top:20px}
+  .cover .stat{text-align:center}
+  .cover .stat .n{font-size:2.2rem;font-weight:800;color:var(--bl)}
+  .cover .stat .l{font-size:.7rem;text-transform:uppercase;letter-spacing:1px;opacity:.7}
+  .cover .meta{margin-top:24px;font-size:.8rem;opacity:.6}
+
+  h2{font-size:1.3rem;color:var(--dk);border-bottom:2px solid var(--bl);padding-bottom:6px;margin:32px 0 16px}
+  h3{font-size:1.05rem;color:#334155;margin:20px 0 8px}
+  p{margin-bottom:12px}
+  
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:.85rem}
+  th{background:var(--dk);color:#fff;padding:9px 12px;text-align:left;font-weight:600}
+  td{padding:8px 12px;border-bottom:1px solid #e2e8f0}
+  tr:hover td{background:#f8fafc}
+  
+  .feature-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:10px;margin:14px 0}
+  .feature{background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px 14px;text-align:center}
+  .feature .icon{font-size:1.5rem;margin-bottom:4px}
+  .feature .name{font-weight:700;font-size:.82rem;color:#0c4a6e}
+  .feature .detail{font-size:.72rem;color:#64748b;margin-top:2px}
+  
+  .diagram{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:20px;margin:14px 0;font-family:'Cascadia Code','Fira Code',monospace;font-size:.78rem;line-height:1.6;white-space:pre;overflow-x:auto}
+  
+  .phase-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0}
+  .phase{background:linear-gradient(135deg,#0f2027,#203a43);color:#fff;border-radius:10px;padding:16px;text-align:center}
+  .phase .num{font-size:.65rem;text-transform:uppercase;letter-spacing:1.5px;opacity:.6;margin-bottom:4px}
+  .phase .title{font-size:.95rem;font-weight:700;margin-bottom:6px}
+  .phase .items{font-size:.75rem;opacity:.8;line-height:1.5}
+  
+  .callout{background:#eff6ff;border-left:4px solid var(--bl);padding:14px 18px;border-radius:6px;margin:14px 0;font-size:.88rem}
+  .callout.green{background:#f0fdf4;border-color:var(--gn)}
+  
+  .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:.7rem;font-weight:600;text-transform:uppercase}
+  .b-native{background:#dbeafe;color:#1e40af}
+  .b-cortex{background:#ede9fe;color:#5b21b6}
+  .b-gov{background:#fef3c7;color:#92400e}
+  .b-auto{background:#d1fae5;color:#065f46}
+  
+  code{background:#f1f5f9;padding:1px 5px;border-radius:3px;font-size:.8rem}
+  
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:12px 0}
+  .col{background:#f8fafc;border-radius:8px;padding:16px;border:1px solid #e2e8f0}
+  .col h4{font-size:.88rem;color:var(--dk);margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px}
+  .col ul{margin:0;padding-left:16px;font-size:.82rem}
+  .col li{margin-bottom:3px}
+  
+  .summary-box{background:linear-gradient(135deg,#0f2027,#203a43);color:#fff;border-radius:14px;padding:32px;text-align:center;margin:30px 0}
+  .summary-box h2{color:#fff;border-bottom:2px solid rgba(255,255,255,.2)}
+  .summary-box .highlight{font-size:1.1rem;margin:16px 0;line-height:1.8}
+  
+  footer{text-align:center;padding:20px;color:var(--gy);font-size:.75rem;border-top:1px solid #e2e8f0;margin-top:30px}
+  
+  @media print{.page{padding:20px}.cover{padding:40px 32px}.diagram{font-size:.7rem}}
+  @media(max-width:700px){.phase-row{grid-template-columns:1fr 1fr}.two-col{grid-template-columns:1fr}.cover .stats{gap:16px}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ═══════════════════ COVER ═══════════════════ -->
+<div class="cover">
+  <h1>Insurance AI Hub</h1>
+  <p class="sub">Solution Design &amp; Snowflake Integration Architecture</p>
+  <div class="stats">
+    <div class="stat"><div class="n">22</div><div class="l">Snowflake Features</div></div>
+    <div class="stat"><div class="n">5</div><div class="l">Cortex Agents</div></div>
+    <div class="stat"><div class="n">18</div><div class="l">Governed Tables</div></div>
+    <div class="stat"><div class="n">25+</div><div class="l">Verified Queries</div></div>
+    <div class="stat"><div class="n">14</div><div class="l">Dashboard Pages</div></div>
+  </div>
+  <div class="meta">Team AgentsSmith | Capgemini | Snowflake Hackathon 2026</div>
+</div>
+
+<!-- ═══════════════════ 1. SOLUTION OVERVIEW ═══════════════════ -->
+<h2>1. Solution Overview</h2>
+<p>The Insurance AI Hub is an enterprise intelligence platform built <strong>entirely on Snowflake</strong>, transforming insurance data into conversational, governed, and actionable insights. Users ask natural-language questions — via text or voice in any language — and receive grounded answers backed by source citations, with the ability to take action through Jira.</p>
+
+<div class="phase-row">
+  <div class="phase">
+    <div class="num">Phase 1</div>
+    <div class="title">Data Foundation</div>
+    <div class="items">18 tables across 3 schemas<br>PII tags + masking policies<br>6 database roles (RBAC)</div>
+  </div>
+  <div class="phase">
+    <div class="num">Phase 2</div>
+    <div class="title">Semantic Layer</div>
+    <div class="items">5 semantic views<br>25+ verified queries<br>Cortex Analyst NL-to-SQL</div>
+  </div>
+  <div class="phase">
+    <div class="num">Phase 3</div>
+    <div class="title">AI Intelligence</div>
+    <div class="items">5 Cortex Agents<br>RAG via Cortex Search<br>Charts + source citations</div>
+  </div>
+  <div class="phase">
+    <div class="num">Phase 4</div>
+    <div class="title">Experience &amp; Action</div>
+    <div class="items">14-page React dashboard<br>Voice + AI_TRANSLATE<br>MCP → Jira integration</div>
+  </div>
+</div>
+
+<!-- ═══════════════════ 2. SNOWFLAKE INTEGRATION MAP ═══════════════════ -->
+<h2>2. Snowflake Feature Integration Map</h2>
+<p>Every capability in the platform maps directly to a native Snowflake feature. No external ML frameworks, no third-party AI APIs, no external databases.</p>
+
+<table>
+  <tr><th>#</th><th>Snowflake Feature</th><th>How We Use It</th><th>Category</th></tr>
+  <tr><td>1</td><td><strong>Cortex Agent</strong></td><td>5 agents with multi-tool orchestration (up to 7 tools per agent). Each agent routes user questions to the right Semantic View, Search service, chart tool, or MCP action.</td><td><span class="badge b-cortex">Cortex AI</span></td></tr>
+  <tr><td>2</td><td><strong>Cortex Analyst</strong></td><td>NL-to-SQL via 5 Semantic Views. The agent calls Cortex Analyst, which matches user questions against Verified Queries or generates SQL from the semantic model.</td><td><span class="badge b-cortex">Cortex AI</span></td></tr>
+  <tr><td>3</td><td><strong>Cortex Search</strong></td><td>RAG over 25 policy document chunks using <code>snowflake-arctic-embed-m-v1.5</code> (768-dim vectors). 1-hour target lag for auto-refresh. Returns top-5 passages with source citations.</td><td><span class="badge b-cortex">Cortex AI</span></td></tr>
+  <tr><td>4</td><td><strong>AI_TRANSLATE</strong></td><td>Multilingual voice input pipeline. User speaks in any language → browser transcribes → <code>AI_TRANSLATE(?, '', 'en')</code> auto-detects and translates to English → agent processes. Parameterized bindings prevent SQL injection.</td><td><span class="badge b-cortex">Cortex AI</span></td></tr>
+  <tr><td>5</td><td><strong>Data-to-Chart</strong></td><td>Agent tool that generates visualizations from query results directly in CoWork conversations.</td><td><span class="badge b-cortex">Cortex AI</span></td></tr>
+  <tr><td>6</td><td><strong>Semantic Views</strong></td><td>5 semantic views defining facts, dimensions, relationships, and time dimensions across 6 analytical domains (Ops, DQ, Competitive, Market, Product Matching).</td><td><span class="badge b-native">Semantic Layer</span></td></tr>
+  <tr><td>7</td><td><strong>Verified Queries (VQRs)</strong></td><td>25+ curated SQL templates that Cortex Analyst uses as golden queries for common business questions, improving accuracy and consistency.</td><td><span class="badge b-native">Semantic Layer</span></td></tr>
+  <tr><td>8</td><td><strong>MCP Connectors</strong></td><td>Atlassian MCP server (Jira + Confluence) using Dynamic Client Registration OAuth. Agents create/search Jira tickets from insights. Per-user authentication.</td><td><span class="badge b-native">Platform</span></td></tr>
+  <tr><td>9</td><td><strong>Snowflake Intelligence (CoWork)</strong></td><td>Account-level Intelligence object with all 5 agents registered. Business users access agents through CoWork without the React dashboard.</td><td><span class="badge b-native">Platform</span></td></tr>
+  <tr><td>10</td><td><strong>Streams (CDC)</strong></td><td>3 append-only streams: CLAIMS_STREAM (fraud monitoring), DQ_RESULTS_STREAM (failure alerting), DOCUMENT_CHUNKS_STREAM (search freshness tracking).</td><td><span class="badge b-auto">Automation</span></td></tr>
+  <tr><td>11</td><td><strong>Tasks (scheduled + triggered)</strong></td><td>3 tasks: daily DQ score refresh (CRON 6 AM UTC), stream-triggered fraud flagging (fraud_score > 0.7), stream-triggered DQ failure alerting. Task DAG with parent-child dependency.</td><td><span class="badge b-auto">Automation</span></td></tr>
+  <tr><td>12</td><td><strong>Alerts</strong></td><td>DQ score drop monitor: every 12 hours, alerts if any table's quality score drops below 70%. Writes to AGENT_AUDIT_LOG for traceability.</td><td><span class="badge b-auto">Automation</span></td></tr>
+  <tr><td>13</td><td><strong>Object Tags</strong></td><td>PII_LEVEL (HIGH/MEDIUM/LOW/NONE) on columns, BUSINESS_DOMAIN (7 values) on tables. Applied at CREATE TABLE time for catalog-level governance.</td><td><span class="badge b-gov">Governance</span></td></tr>
+  <tr><td>14</td><td><strong>Dynamic Masking Policies</strong></td><td>3 policies: MASK_EMAIL (partial redaction), MASK_PHONE (full redaction), MASK_ADDRESS (full redaction). Uses <code>IS_DATABASE_ROLE_IN_SESSION</code> — admin sees real data, everyone else sees masked.</td><td><span class="badge b-gov">Governance</span></td></tr>
+  <tr><td>15</td><td><strong>Database Roles</strong></td><td>6-role hierarchy: ADMIN → DATA_STEWARD, EXEC → ANALYST, UW → ANALYST, CLAIMS → ANALYST. Separate DEPLOY_ROLE (DDL) and SERVICE_ROLE (runtime) at account level.</td><td><span class="badge b-gov">Governance</span></td></tr>
+  <tr><td>16</td><td><strong>Resource Monitor</strong></td><td>500 credits/month on COMPUTE_WH. Triggers: notify at 75%, notify at 90%, suspend at 100%.</td><td><span class="badge b-gov">Cost Control</span></td></tr>
+  <tr><td>17</td><td><strong>Budget</strong></td><td>1,000 credits/month covering warehouse + serverless AI (Cortex inference, Search, tasks). Caps all credit types, not just warehouse.</td><td><span class="badge b-gov">Cost Control</span></td></tr>
+  <tr><td>18</td><td><strong>Query Acceleration</strong></td><td>Enabled on COMPUTE_WH for ad-hoc analytical queries from dashboard and agents.</td><td><span class="badge b-native">Performance</span></td></tr>
+  <tr><td>19</td><td><strong>Vector Embeddings</strong></td><td><code>VECTOR(FLOAT, 768)</code> column on DOCUMENT_CHUNKS for semantic similarity search via Cortex Search.</td><td><span class="badge b-native">Data</span></td></tr>
+  <tr><td>20</td><td><strong>Stored Procedures</strong></td><td>6 procedures: 4 JavaScript (claim risk scoring, trend detection, product matching, price optimization) + 2 SQL (DQ root cause, market forecast). All use parameterized bindings.</td><td><span class="badge b-native">Data</span></td></tr>
+  <tr><td>21</td><td><strong>Cortex Project YAML</strong></td><td>11 YAML artifacts (5 agents + 5 SVs + 1 manifest) for declarative deployment via <code>snow cortex deploy</code>.</td><td><span class="badge b-native">DevOps</span></td></tr>
+  <tr><td>22</td><td><strong>Cross-region Inference</strong></td><td><code>CORTEX_ENABLED_CROSS_REGION = 'ANY_REGION'</code> for Cortex AI availability, with budget guardrails to cap costs.</td><td><span class="badge b-native">Platform</span></td></tr>
+</table>
+
+<!-- ═══════════════════ 3. ARCHITECTURE DIAGRAM ═══════════════════ -->
+<h2>3. Solution Architecture</h2>
+
+<div class="diagram">
+                         ┌───────────────────────────────────────┐
+                         │          USER INTERFACES              │
+                         │                                       │
+                         │  ┌────────────┐   ┌────────────────┐ │
+                         │  │ React      │   │ Snowflake      │ │
+                         │  │ Dashboard  │   │ CoWork         │ │
+                         │  │ (14 pages) │   │ (5 agents)     │ │
+                         │  │ Voice+Mic  │   │ Data-to-Chart  │ │
+                         │  └─────┬──────┘   └───────┬────────┘ │
+                         └────────┼──────────────────┼──────────┘
+                                  │                  │
+           ┌──────────────────────┼──────────────────┼────────────────────┐
+           │                      ▼                  ▼                    │
+           │            ┌─────────────────────────────────────┐          │
+           │            │         CORTEX AI LAYER             │          │
+           │            │                                     │          │
+           │            │   5 Cortex Agents                   │          │
+           │            │   ├── Cortex Analyst (NL → SQL)     │          │
+           │            │   ├── Cortex Search (RAG)           │          │
+           │            │   ├── Data-to-Chart                 │          │
+           │            │   └── Atlassian MCP → Jira          │          │
+           │            │                                     │          │
+           │            │   AI_TRANSLATE (voice pipeline)     │          │
+           │            └──────────────┬──────────────────────┘          │
+           │                           │                                  │
+           │            ┌──────────────┼──────────────────────┐          │
+           │            │   SEMANTIC &amp; SEARCH LAYER            │          │
+           │            │                                     │          │
+           │            │   5 Semantic Views (25+ VQRs)       │          │
+           │            │   1 Cortex Search Service           │          │
+           │            │   (Arctic Embed M v1.5, 768-dim)    │          │
+           │            └──────────────┬──────────────────────┘          │
+           │                           │                                  │
+           │            ┌──────────────┼──────────────────────┐          │
+           │            │         DATA LAYER                  │          │
+           │            │                                     │          │
+           │            │  ANALYTICS     DOCUMENTS   DATA_    │          │
+           │            │  12 tables     2 tables    QUALITY  │          │
+           │            │  7 views       Search Svc  4 tables │          │
+           │            │  5 procedures              1 view   │          │
+           │            └──────────────┬──────────────────────┘          │
+           │                           │                                  │
+           │  ┌────────────────────────┼────────────────────────────┐    │
+           │  │     AUTOMATION         │        GOVERNANCE          │    │
+           │  │                        │                            │    │
+           │  │  3 Streams (CDC)       │  2 Tags + 3 Masking       │    │
+           │  │  3 Tasks (cron+trig)   │  6 Database Roles         │    │
+           │  │  1 Alert (DQ monitor)  │  Resource Mon + Budget    │    │
+           │  └────────────────────────┴────────────────────────────┘    │
+           │                                                             │
+           │                       SNOWFLAKE                             │
+           └─────────────────────────────────────────────────────────────┘</div>
+
+<!-- ═══════════════════ 4. AGENT ARCHITECTURE ═══════════════════ -->
+<h2>4. Agent Architecture &amp; Tool Routing</h2>
+
+<table>
+  <tr><th>Agent</th><th>Tools</th><th>Semantic Views</th><th>Search</th><th>Chart</th><th>MCP</th></tr>
+  <tr><td><strong>Insurance Intelligence</strong></td><td>3</td><td>SV_INSURANCE_OPS, SV_DATA_QUALITY</td><td>CORTEX_SEARCH_SVC</td><td>—</td><td>—</td></tr>
+  <tr><td><strong>Unified Enterprise Hub</strong></td><td>7+chart+MCP</td><td>All 5 SVs</td><td>CORTEX_SEARCH_SVC</td><td>data_to_chart</td><td>Atlassian</td></tr>
+  <tr><td><strong>Market Intelligence</strong></td><td>2+chart+MCP</td><td>SV_MARKET_INTELLIGENCE, SV_INSURANCE_OPS</td><td>—</td><td>data_to_chart</td><td>Atlassian</td></tr>
+  <tr><td><strong>Price Optimization</strong></td><td>2+MCP</td><td>SV_COMPETITIVE_INTEL, SV_INSURANCE_OPS</td><td>—</td><td>—</td><td>Atlassian</td></tr>
+  <tr><td><strong>Product Matching</strong></td><td>3+MCP</td><td>SV_PRODUCT_MATCHING, SV_INSURANCE_OPS</td><td>CORTEX_SEARCH_SVC</td><td>—</td><td>Atlassian</td></tr>
+</table>
+
+<h3>Routing Flow</h3>
+<div class="diagram">
+User Question (text or voice in any language)
+    │
+    ├── [if voice] Browser Web Speech API → transcript
+    ├── [if non-English] AI_TRANSLATE(?, '', 'en') → English
+    │
+    ▼
+Cortex Agent (orchestration model)
+    │
+    ├── customers/policies/claims → Cortex Analyst → SV_INSURANCE_OPS
+    ├── data quality/DQ scores    → Cortex Analyst → SV_DATA_QUALITY
+    ├── policy docs/coverage      → Cortex Search  → CORTEX_SEARCH_SVC
+    ├── competitor pricing        → Cortex Analyst → SV_COMPETITIVE_INTEL
+    ├── market trends             → Cortex Analyst → SV_MARKET_INTELLIGENCE
+    ├── product matching          → Cortex Analyst → SV_PRODUCT_MATCHING
+    ├── "show me a chart"         → Data-to-Chart
+    ├── "create Jira ticket"      → Atlassian MCP  → Jira API
+    └── cross-domain              → decompose → multiple tools
+    │
+    ▼
+Grounded Response (data + citations + optional chart/Jira link)</div>
+
+<!-- ═══════════════════ 5. DATA MODEL ═══════════════════ -->
+<h2>5. Data Model &amp; Domains</h2>
+
+<table>
+  <tr><th>Schema</th><th>Tables</th><th>Purpose</th><th>Rows</th></tr>
+  <tr><td rowspan="7"><strong>ANALYTICS</strong></td><td>CUSTOMERS</td><td>Customer profiles with PII masking (email, phone, address)</td><td>200</td></tr>
+  <tr><td>POLICIES</td><td>Insurance policies with premium, coverage, loss ratio</td><td>300</td></tr>
+  <tr><td>CLAIMS</td><td>Claims with fraud scoring, adjuster assignment, friction points</td><td>400</td></tr>
+  <tr><td>BILLING</td><td>Payment tracking with outstanding balance, late fees</td><td>500</td></tr>
+  <tr><td>AT_RISK_POLICIES</td><td>Churn prediction with risk scores, revenue at risk</td><td>165</td></tr>
+  <tr><td>PRODUCT_CATALOG + COMPETITOR_PRICING + MARKET_TRENDS + MATCH_SCORES + SCENARIOS</td><td>Competitive intel, market analysis, product matching</td><td>400</td></tr>
+  <tr><td>AGENT_AUDIT_LOG</td><td>Agent observability — every question, tool call, response logged</td><td>system</td></tr>
+  <tr><td><strong>DOCUMENTS</strong></td><td>POLICY_DOCUMENTS + DOCUMENT_CHUNKS</td><td>10 insurance policies chunked into 25 RAG-searchable segments with 768-dim embeddings</td><td>35</td></tr>
+  <tr><td rowspan="2"><strong>DATA_QUALITY</strong></td><td>DQ_RULES + DQ_RESULTS</td><td>50 data quality rules across 10 types, 40 execution results with error samples</td><td>90</td></tr>
+  <tr><td>DQ_SCORES + DQ_COLUMN_HEALTH</td><td>Weekly quality scores (4 dimensions) + column-level health monitoring</td><td>56</td></tr>
+</table>
+
+<!-- ═══════════════════ 6. GOVERNANCE ═══════════════════ -->
+<h2>6. Governance &amp; Security</h2>
+
+<div class="two-col">
+  <div class="col">
+    <h4>Access Control (RBAC)</h4>
+    <ul>
+      <li><strong>INSURANCE_ADMIN_ROLE</strong> — Full access + masking bypass</li>
+      <li><strong>INSURANCE_EXEC_ROLE</strong> — Agents + MCP + analytics read</li>
+      <li><strong>INSURANCE_UW_ROLE</strong> — Pricing + matching agents</li>
+      <li><strong>INSURANCE_CLAIMS_ROLE</strong> — Analytics + documents</li>
+      <li><strong>INSURANCE_DATA_STEWARD_ROLE</strong> — Data quality schema</li>
+      <li><strong>INSURANCE_ANALYST_ROLE</strong> — Base analytics read</li>
+      <li>Separate <code>DEPLOY_ROLE</code> (DDL) and <code>SERVICE_ROLE</code> (runtime)</li>
+    </ul>
+  </div>
+  <div class="col">
+    <h4>Data Protection</h4>
+    <ul>
+      <li><strong>PII_LEVEL tag</strong> — HIGH (email, phone, address), MEDIUM (DOB)</li>
+      <li><strong>BUSINESS_DOMAIN tag</strong> — 7 domains for catalog classification</li>
+      <li><strong>MASK_EMAIL</strong> — <code>jo***@email.com</code> for non-admin</li>
+      <li><strong>MASK_PHONE</strong> — <code>***-****</code> for non-admin</li>
+      <li><strong>MASK_ADDRESS</strong> — <code>*** REDACTED ***</code> for non-admin</li>
+      <li><strong>Resource Monitor</strong> — 500 credits/month, auto-suspend</li>
+      <li><strong>Budget</strong> — 1,000 credits/month (warehouse + serverless AI)</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ═══════════════════ 7. AUTOMATION ═══════════════════ -->
+<h2>7. Automation &amp; Real-Time Monitoring</h2>
+
+<div class="diagram">
+STREAMS (Change Data Capture)
+  CLAIMS_STREAM ──────────► TASK_FLAG_HIGH_FRAUD_CLAIMS
+                              (logs claims with fraud_score > 0.7)
+
+  DQ_RESULTS_STREAM ──────► TASK_DQ_FAILURE_ALERT
+                              (logs critical DQ failures)
+
+SCHEDULED TASK
+  TASK_DQ_DAILY_SCORE_REFRESH (CRON 6 AM UTC)
+      └──► TASK_DQ_FAILURE_ALERT (child, runs after parent)
+
+ALERT
+  ALERT_DQ_SCORE_DROP (every 12 hours)
+      IF any table DQ score &lt; 70% → write to AGENT_AUDIT_LOG</div>
+
+<!-- ═══════════════════ 8. VOICE PIPELINE ═══════════════════ -->
+<h2>8. Multilingual Voice Pipeline</h2>
+
+<div class="diagram">
+User speaks        Web Speech API      AI_TRANSLATE            Cortex Agent
+(any language) ──► speech-to-text ──► SELECT AI_TRANSLATE  ──► processes
+                   (client-side,      (?, '', 'en')            English query
+                    no Snowflake       (parameterized,          with citations
+                    compute)           auto-detect source)
+
+Supported: 30+ languages | 7 dashboard pages | SQL-injection safe</div>
+
+<div class="callout green">
+  <strong>Security:</strong> User voice text is sent as a bind parameter (<code>?</code>) to <code>AI_TRANSLATE</code> — it never touches the SQL string. The <code>executeSQLWithBindings()</code> function sends values out-of-band via the Snowflake SQL API bindings mechanism.
+</div>
+
+<!-- ═══════════════════ 9. DEPLOYMENT ═══════════════════ -->
+<h2>9. Deployment &amp; Production Readiness</h2>
+
+<table>
+  <tr><th>Aspect</th><th>Implementation</th></tr>
+  <tr><td><strong>SQL Scripts</strong></td><td>21 modular scripts (00-21) with numbered execution order and dependency comments</td></tr>
+  <tr><td><strong>Cortex Project</strong></td><td>11 YAML artifacts — deploy with <code>snow cortex deploy --project-dir cortex_project/</code></td></tr>
+  <tr><td><strong>Deploy Script</strong></td><td><code>deploy.sh</code> — 14-phase automated deployment with error handling</td></tr>
+  <tr><td><strong>CI/CD Pipeline</strong></td><td>GitHub Actions with 3 jobs: SnowSQL deploy, React build, object validation</td></tr>
+  <tr><td><strong>Rollback</strong></td><td><code>20_rollback.sql</code> — 12-section teardown in reverse dependency order</td></tr>
+  <tr><td><strong>Cost Controls</strong></td><td>Resource monitor (500 credits) + budget (1,000 credits) + auto-suspend warehouse</td></tr>
+  <tr><td><strong>Dashboard</strong></td><td>React 18 + TypeScript + Tailwind + Vite + Recharts + Zustand</td></tr>
+</table>
+
+<!-- ═══════════════════ SUMMARY ═══════════════════ -->
+<div class="summary-box">
+  <h2>Summary</h2>
+  <div class="highlight">
+    <strong>22 Snowflake features</strong> — from Cortex Agents and Semantic Views to Streams, Tasks, Alerts, Tags, Masking, RBAC, Budgets, and MCP.<br><br>
+    <strong>Zero external dependencies</strong> — all AI, storage, compute, governance, and automation run natively inside Snowflake.<br><br>
+    <strong>Production-ready</strong> — modular deployment, CI/CD, rollback, cost controls, and audit logging from day one.<br><br>
+    <strong>Voice in. Intelligence out. In any language.</strong>
+  </div>
+</div>
+
+</div>
+
+<footer>
+  Insurance AI Hub — Solution Design &amp; Snowflake Integration | Team AgentsSmith | Capgemini | September 2026
+</footer>
+
+</body>
+</html>

@@ -130,7 +130,15 @@ DROP DATABASE ROLE IF EXISTS INSURANCE_AI_HUB.INSURANCE_DATA_STEWARD_ROLE;
 
 
 -- ############################################################################
--- SECTION 11: Drop Database (cascades all tables, schemas)
+-- SECTION 11: Drop Budget (must be done before dropping database)
+-- The budget is a SNOWFLAKE.CORE.BUDGET instance inside INSURANCE_AI_HUB.ANALYTICS.
+-- ############################################################################
+
+DROP SNOWFLAKE.CORE.BUDGET IF EXISTS INSURANCE_AI_HUB.ANALYTICS.INSURANCE_AI_HUB_BUDGET;
+
+
+-- ############################################################################
+-- SECTION 12: Drop Database (cascades all tables, schemas)
 -- This is the nuclear option. Comment out if you want to keep the database
 -- and only drop individual objects above.
 -- ############################################################################
@@ -139,7 +147,7 @@ DROP DATABASE ROLE IF EXISTS INSURANCE_AI_HUB.INSURANCE_DATA_STEWARD_ROLE;
 
 
 -- ############################################################################
--- SECTION 12: Drop Account-level objects
+-- SECTION 13: Drop Account-level objects
 -- Only run these if fully removing the solution from the account.
 -- ############################################################################
 
