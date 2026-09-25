@@ -1,0 +1,41 @@
+# created-by: streamlit-in-workspaces; skill-version=1.0.0
+definition_version: 2
+entities:
+  streamlit_app:
+    type: streamlit
+    query_warehouse: COMPUTE_WH
+    compute_pool: SYSTEM_COMPUTE_POOL_CPU
+    main_file: streamlit_app.py
+    artifacts:
+      - pyproject.toml
+      - streamlit_app.py
+      - .streamlit/config.toml
+      - app_pages/__init__.py
+      - app_pages/executive_dashboard.py
+      - app_pages/kpi_dashboard.py
+      - app_pages/ai_assistant.py
+      - app_pages/knowledge_hub.py
+      - app_pages/agent_insights.py
+      - app_pages/document_intelligence.py
+      - app_pages/data_explorer.py
+      - app_pages/governance_dashboard.py
+      - app_pages/admin_console.py
+      - app_pages/enterprise_hub_agent.py
+      - app_pages/market_intel_agent.py
+      - app_pages/pricing_advisor_agent.py
+      - app_pages/product_matcher_agent.py
+      - utils/__init__.py
+      - utils/queries.py
+      - utils/charts.py
+      - utils/agent_chat.py
+      - utils/agent_client.py
+    identifier:
+      database: INSURANCE_AI_HUB
+      schema: ANALYTICS
+      name: INSURANCE_AI_HUB_STREAMLIT
+    title: insurance-ai-hub-streamlit
+    run_mode: SpcsOnly
+    execute_as: OWNER
+    sharing:
+      - role: ACCOUNTADMIN
+        with_grant_option: true
